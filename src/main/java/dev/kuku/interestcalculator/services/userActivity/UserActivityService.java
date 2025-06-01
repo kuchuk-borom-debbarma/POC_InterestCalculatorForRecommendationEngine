@@ -29,6 +29,10 @@ public class UserActivityService {
             ActivityLevel.NOLIFER_ACTIVITY, 5000
     );
 
+    /**
+     * @param userId id of the user
+     * @param timespan from - to timespan
+     */
     public ActivityLevel getActivityLevelOfUser(String userId, Tuple2<Long, Long> timespan) {
         // Get user interactions for the specified timespan
         List<UserInteractionEntity> userInteractions = userInteractionRepo.getUserInteractionByTimespan(userId, timespan);

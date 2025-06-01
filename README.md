@@ -70,64 +70,18 @@ Interest scores naturally decay over time to reflect changing preferences:
 
 Topics are interconnected through weighted relationships that create cascading score effects. The system maintains a global topic relationship database that continuously evolves based on real-world content patterns.
 
-##### **Dynamic Relationship Calculation**
-
-The cross-topic network operates through batch processing during user interest score updates:
-
-**Process Flow:**
-1. **Batch Topic Collection**: During each user interest calculation batch, extract all unique topic combinations from the processed content
-2. **Co-occurrence Analysis**: Count how frequently topic pairs appear together within the same posts across the batch
-3. **Sliding Window Update**: Calculate relationship strengths based on the last 30 days of co-occurrence data, automatically discarding outdated relationships
-
-**Relationship Strength Formula** (using Jaccard Similarity):
-```
-Strength = Co-occurrences / (Freq_TopicA + Freq_TopicB - Co-occurrences)
-```
-
-**Example Calculation:**
-```
-Batch contains:
-- [gaming, csgo, fps] appears 25 times
-- [gaming, valorant, fps] appears 30 times  
-- [csgo, competitive, esports] appears 20 times
-
-Resulting relationships:
-- gaming ↔ fps: 0.67 strength (appears together 55/82 times)
-- fps ↔ csgo: 0.42 strength  
-- gaming ↔ competitive: 0.28 strength
-```
-
-##### **Sliding Window Approach**
-
-Instead of infinite accumulation, the system uses a **30-day sliding window** to maintain relationship relevance:
-
-- **Daily Processing**: Each batch recalculates topic relationships using only the past 30 days of co-occurrence data
-- **Automatic Decay**: Relationships naturally fade when topics stop co-occurring, reflecting real-world trend changes
-- **Trend Adaptation**: Emerging topic combinations gain strength while declining ones lose influence
-- **Threshold Filtering**: Relationships below 0.1 strength are automatically removed to reduce noise
-
-**Real-World Example:**
-- **Week 1-2**: Gaming + Fortnite content surge → Strong relationship (0.8)
-- **Week 3-4**: Trend shifts to Valorant → Gaming + Fortnite weakens (0.4), Gaming + Valorant strengthens (0.7)
-- **Week 5+**: Fortnite relationship drops below threshold and disappears, Valorant becomes dominant
-
-##### **Influence Propagation**
-
-When a user interacts with content, scores propagate through the relationship network:
-
-**Direct Interaction Impact:**
-- User comments on "Python tutorial" → +4.0 to Python score
-
-**Cross-Topic Influence:**
-- Python → Programming: +3.2 points (4.0 × 0.8 relationship strength)
-- Programming → Technology: +1.9 points (3.2 × 0.6 relationship strength)
-- Python → Data Science: +2.8 points (4.0 × 0.7 relationship strength)
-
 **Benefits:**
 - **Content Discovery**: Users discover related topics they haven't directly engaged with
 - **Trend Awareness**: Algorithm adapts to emerging topic relationships in real-time
 - **Reduced Cold Start**: New or niche topics gain visibility through established relationships
 - **Natural Evolution**: Topic network evolves organically with user behavior patterns
+
+
+Design idea. This one is a heavy task so it needs to be performed separately. It can make use of a queue from which it processing periodically. The main function to calculate user interest score will push data in this queue.
+The function for this operation will determine the topic's relationship and batch in its current batch and then increment them to existing scores. Then we take the highest and lowest score in the table to normalize the score in specific range.
+We first decay the scores based on time though and then add the score and stuff.
+
+There will be a range, if it exceeds that range it is going viral
 
 ##### **Storage and Performance**
 
@@ -160,5 +114,3 @@ As users repeatedly engage with similar topics, the rate of score increase dimin
 
 **Example**: A user who has interacted with 200 cooking posts will see reduced cooking score increases (0.6x) for new cooking interactions, making it easier for other interests (like travel or music) to compete for feed prominence.
 
-
-NOTE if we have a chain to follow then the score will get weaker as we go down the level.
