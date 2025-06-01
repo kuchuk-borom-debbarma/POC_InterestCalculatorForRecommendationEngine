@@ -43,9 +43,10 @@ public class UserInterestService {
             long timeElapsed = currentTime - lastUpdatedTimestamp;
             long daysElapsed = timeElapsed / (24 * 60 * 60 * 1000);
             // Apply decay factor based on elapsed time as per README
-            double decayFactor = 1.0; // Default: no decay
+            double decayFactor = -1.0; // Default: no decay
             if (daysElapsed <= 7) {
                 // Recent interactions (0-7 days): No decay (1.0x)
+                decayFactor = 1.0;
             } else if (daysElapsed <= 28) {
                 // Moderate age (1-4 weeks): Slight decay (0.8-0.9x)
                 // Linear interpolation between 0.9 and 0.8
@@ -71,4 +72,72 @@ public class UserInterestService {
 
         userInterestRepo.saveUserInterests(updatedEntity);
     }
+
+    /**
+     * Calculates the saturation multiplier based on the current interest score.
+     * As a user's interest score in a topic increases, new interactions with that topic
+     * will have diminishing returns to prevent algorithmic "rabbit holes" and encourage
+     * content diversity.
+     *
+     * @param currentScore The current interest score for a specific topic
+     * @param scoreRange   A tuple containing (minScore, maxScore) to define the saturation thresholds
+     * @return A multiplier between 0.1 and 1.0 to be applied to new score additions
+     */
+    public double calculateSaturationMultiplier(int currentScore, Tuple<Integer, Integer> scoreRange) {
+        // Extract the min and max from the score range
+        int minScore = scoreRange._1();
+        int maxScore = scoreRange._2();
+
+        // Calculate threshold values based on the provided range
+        int threshold1 = minScore + (int) ((maxScore - minScore) * 0.1);  // 10% of range
+        int threshold2 = minScore + (int) ((maxScore - minScore) * 0.3);  // 30% of range
+        int threshold3 = minScore + (int) ((maxScore - minScore) * 0.6);  // 60% of range
+        int threshold4 = minScore + (int) ((maxScore - minScore) * 0.9);  // 90% of range
+
+        // Define multipliers based on where the current score falls within the range
+        if (currentScore <= threshold1) {
+            // Fresh Interest: Full impact (1.0x)
+            return 1.0;
+        } else if (currentScore <= threshold2) {
+            // Developing Interest: Reduced impact (0.8x)
+            return 0.8;
+        } else if (currentScore <= threshold3) {
+            // Established Interest: Diminished impact (0.6x)
+            return 0.6;
+        } else if (currentScore <= threshold4) {
+            // Saturated Interest: Minimal impact (0.3x)
+            return 0.3;
+        } else {
+            // Extremely Saturated Interest: Very minimal impact (0.1x)
+            return 0.1;
+        }
+    }
+
+    /**
+     * Alternative implementation using a continuous function for smoother transitions
+     * between saturation levels.
+     *
+     * @param currentScore The current interest score for a specific topic
+     * @param scoreRange   A tuple containing (minScore, maxScore) to define the saturation curve
+     * @return A multiplier between 0.1 and 1.0 to be applied to new score additions
+     */
+    public double calculateSaturationMultiplierContinuous(int currentScore, Tuple<Integer, Integer> scoreRange) {
+        // Extract the min and max from the score range
+        int minScore = scoreRange._1();
+        int maxScore = scoreRange._2();
+
+        // Calculate the midpoint of the range, which will be used as the scaling factor
+        double scalingFactor = (maxScore - minScore) / 2.0;
+
+        // Normalize the current score relative to the range
+        double normalizedScore = (currentScore - minScore) / (double) (maxScore - minScore);
+
+        // Calculate the saturation multiplier using a sigmoid-like curve
+        // This will give 1.0 for low scores and gradually approach 0.1 for high scores
+        double rawMultiplier = 1.0 / (1.0 + (normalizedScore * 3.0));
+
+        // Ensure multiplier never goes below 0.1
+        return Math.max(0.1, rawMultiplier);
+    }
+
 }
