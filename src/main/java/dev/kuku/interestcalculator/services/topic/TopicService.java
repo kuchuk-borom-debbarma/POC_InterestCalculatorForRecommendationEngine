@@ -10,8 +10,6 @@ import java.util.Set;
 @Service
 @RequiredArgsConstructor
 public class TopicService {
-    private final TopicRelationshipRepo topicRelationshipRepo;
-
     public void updateTopicRelationships(List<Set<String>> topicSets) {
 
     }

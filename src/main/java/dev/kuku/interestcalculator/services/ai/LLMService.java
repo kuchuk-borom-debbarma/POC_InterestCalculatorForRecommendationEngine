@@ -9,12 +9,9 @@ import java.util.Set;
 @Service
 public class LLMService {
     /**
-     * get topics mapped to contentId
-     * @param existingTopics existing topics to choose from in valid
-     * @param contents key-> contentId, value -> content data
-     * @return map of contentId and set of topics. It can be existing or new topic.
+     * get topics of a content
      */
-    public Map<String, Set<String>> getTopics(List<String> existingTopics, Map<String,String> contents) {
+    public List<String> getTopics(List<String> existingTopics, String contentData) {
 
     }
 }

@@ -4,6 +4,6 @@ import org.yaml.snakeyaml.util.Tuple;
 
 import java.util.Map;
 
-///  userId -> topic & score, timestamp
+///  userId -> topics & score, timestamp
 public record UserInterestEntity(String userId, Map<String, Tuple<Integer, Long>> topics) {
 }
