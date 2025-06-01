@@ -132,8 +132,10 @@ public class UserInterestService {
             5. Finally we will update ALL the scores with saturation in mind and save it to the database.
              */
             /*
-            6. Next, we call updateTopicRelationships. TBD
+            6. Next, we call updateTopicRelationships. We pass set of topics and it will create connection and strengths between them based on how many time it is related. We first decay existing score and then apply this.
              */
+
+            //We need to normalize both the user topic score and cross toipic relationship score by keeping track of min and max and normalizing each of them
 
         }
     }
