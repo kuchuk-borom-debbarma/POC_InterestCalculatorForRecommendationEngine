@@ -1,10 +1,8 @@
-package dev.kuku.interestcalculator.services.ai;
+package dev.kuku.interestcalculator;
 
 import org.springframework.stereotype.Service;
 
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
 
 @Service
 public class LLMService {

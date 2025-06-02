@@ -5,5 +5,5 @@ import org.yaml.snakeyaml.util.Tuple;
 import java.util.Map;
 
 ///  userId -> topics & score, timestamp
-public record UserInterestEntity(String userId, Map<String, Tuple<Integer, Long>> topics) {
+public record UserInterestEntity(String userId, Map<String, Tuple<Long, Long>> topics) {
 }
