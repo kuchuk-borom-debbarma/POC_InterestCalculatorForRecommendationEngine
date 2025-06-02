@@ -21,10 +21,8 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 @Slf4j
 public class LLMService {
+    private static final int maxTopics = 100;
     private final ChatModel chatModel;
-
-    @Value("${topic.extraction.max-topics:3}")
-    private int maxTopics;
 
     /**
      * Extracts relevant topics from content data by using an LLM.
@@ -42,15 +40,13 @@ public class LLMService {
                     ? contentData.substring(0, 2000) + "..."
                     : contentData;
 
-            // System message defines the task and constraints
+            // Update the system message to be more explicit
             Message systemMessage = new SystemMessage(
-                    "You are a topic extraction system. " +
-                            "Your task is to identify the most relevant topics for the given content. " +
-                            "First, try to select from the provided list of existing topics. " +
-                            "Only create new topics if none of the existing topics are sufficiently relevant. " +
-                            "Return exactly " + maxTopics + " topics maximum, fewer if appropriate. " +
-                            "Format your response as a comma-separated list of topics with no explanation or additional text."
+                    "Extract specific, detailed topics from content. Prioritize existing topics when relevant. " +
+                    "Identify nuanced topics based on subject matter, emotions, scenarios, and context. " +
+                    "Return ONLY a comma-separated list of topics. NO EXPLANATIONS, NO NUMBERING, NO HEADERS."
             );
+
 
             // Format existing topics as a comma-separated string
             String existingTopicsString = String.join(", ", existingTopics);
@@ -68,11 +64,11 @@ public class LLMService {
                     OllamaOptions.builder()
                             .temperature(0.2) // Lower temperature for more deterministic topic extraction
                             .build());
-            
+
             ChatResponse response = chatModel.call(prompt);
 
             // Parse the response - use getText() method instead of getContent()
-            String topicsResponse = response.getResult().getOutput().getText().trim();
+            String topicsResponse = getTopicFromResponse(response);
 
             // Split by comma and clean up each topic
             List<String> extractedTopics = Arrays.stream(topicsResponse.split(","))
@@ -91,5 +87,23 @@ public class LLMService {
             // In case of failure, return a single generic topic to avoid breaking the application
             return List.of("general");
         }
+    }
+
+    private static String getTopicFromResponse(ChatResponse response) {
+        String topicsResponse = response.getResult().getOutput().getText().trim();
+
+        // Strip out any explanatory text before the actual list
+        if (topicsResponse.contains("\n")) {
+            // If there are line breaks, take only what comes after the last one
+            topicsResponse = topicsResponse.substring(topicsResponse.lastIndexOf("\n")).trim();
+        }
+
+        // Remove any prefixes like "1.", "- ", etc.
+        topicsResponse = topicsResponse.replaceAll("^[0-9]+\\.\\s*", "")
+                                       .replaceAll("^-\\s*", "");
+
+        // Remove any "topics:" prefix
+        topicsResponse = topicsResponse.replaceAll("(?i)^.*topics:?\\s*", "");
+        return topicsResponse;
     }
 }
