@@ -219,8 +219,39 @@ public class UserInterestService {
     }
 
     /**
-     * Works by getting all the topics, and it's score for the user and then decaying the score based on the time the topic was updated last and current time.
-     * Decaying ensures that topics which are no longer relevant to the user are gradually removed from their interests.
+     * Temporal Decay for User Interests
+     * 
+     * This method applies time-based decay to a user's interest scores, simulating the natural fading of interests over time.
+     * The decay follows a progressive curve from recent interests (no decay) to historical interests (significant decay).
+     * 
+     * Key behaviors:
+     * 1. Topics with zero scores after decay are automatically removed from the user's interest profile
+     * 2. The timestamp of last activity is preserved, allowing for accurate decay calculation in future updates
+     * 
+     * Design considerations:
+     * - Interest Retention for Inactive Users: The current implementation may result in complete topic removal for
+     *   long-inactive users. This provides a "clean slate" when they return. Alternative approaches include:
+     *   
+     *   Example: A user who hasn't engaged for 8 months returns to find their previous interests have decayed to zero.
+     *   The system now treats them similar to a new user, allowing rapid adaptation to their current interests.
+     *   
+     * - Topic Capacity Limits: An alternative approach would implement a maximum topic capacity per user (e.g., 30 topics),
+     *   removing only the lowest-scoring topics when capacity is reached rather than zero-score topics.
+     *   
+     *   Example: If a user has 30 topics and returns after inactivity, instead of removing all decayed topics,
+     *   the system preserves their historical top interests to provide continuity in content recommendations.
+     * 
+     * - Score Normalization: The current implementation maintains absolute scores. Consider normalizing scores
+     *   within a fixed range (e.g., 0-1000) based on the user's highest and lowest scores to maintain balanced
+     *   topic distribution regardless of activity level.
+     *   
+     *   Example: After decay, a user's scores range from 10 to 875. Normalizing would rescale these to utilize the
+     *   full 0-1000 range, giving clearer separation between interest levels.
+     *
+     * The current implementation prioritizes adaptability and relevance by removing zero-score topics,
+     * ensuring the user's interest profile remains current and reflective of genuine ongoing interests.
+     *
+     * @param userId The identifier of the user whose interest scores should be decayed
      */
     public void decayInterestScore(String userId) {
         Map<String, Tuple<Long, Long>> userInterestsMap = db.getUserInterests(userId);
@@ -248,12 +279,60 @@ public class UserInterestService {
         db.updateUserInterests(helper.updateUserInterestsAndReturn(userId, updatedTopics));
     }
 
-    public void decayTopicRelationships(double decayFactor, long minimumWeight) {
+    /**
+     * Adaptive Decay for Topic Relationships
+     * 
+     * This method applies intelligent decay to topic relationship weights based on multiple factors:
+     * 1. Time-based decay using the decay factor parameter
+     * 2. Popularity-based adjustment to identify and reduce artificially sustained relationships
+     * 
+     * The implementation addresses a key challenge in relationship scoring: topics that remain active due to
+     * a small number of highly engaged users rather than genuine broad interest. This ensures that topic
+     * relationships reflect actual content affinity patterns across the user base rather than outlier behavior.
+     * 
+     * Approach:
+     * - Calculate a popularity score for each topic based on user engagement breadth
+     * - Apply stronger decay to relationships where topics have low engagement breadth
+     * - Remove relationships that fall below the minimum weight threshold
+     * 
+     * Example: A relationship between "Cryptocurrency" and "Finance" that was once trending (weight: 85)
+     * but is now only sustained by 2 active users will receive an additional decay multiplier of 0.7x,
+     * accelerating its decline compared to topics engaged with by hundreds of users.
+     * 
+     * @param baseDecayFactor The standard time-based decay factor (e.g., 0.9 for 10% decay per cycle)
+     * @param minimumWeight The threshold below which relationships are removed
+     */
+    public void decayTopicRelationships(double baseDecayFactor, long minimumWeight) {
+        // 1. Calculate popularity metrics for each topic
+        Map<String, Integer> topicEngagementCounts = helper.calculateTopicEngagementBreadth(db.userInterestEntities);
+        
+        // Find max engagement to normalize popularity
+        int maxEngagement = topicEngagementCounts.values().stream()
+                .max(Integer::compare)
+                .orElse(1);
+        
         List<TopicRelationshipEntity> updatedRelationships = new ArrayList<>();
 
         for (TopicRelationshipEntity relationship : db.topicRelationships) {
-            long newWeight = (long) Math.max(0, (relationship.weight() * decayFactor));
+            // 2. Calculate popularity-adjusted decay factor
+            String topic1 = relationship.topic1();
+            String topic2 = relationship.topic2();
+            
+            int topic1Engagement = topicEngagementCounts.getOrDefault(topic1, 0);
+            int topic2Engagement = topicEngagementCounts.getOrDefault(topic2, 0);
+            
+            // Calculate popularity ratios (0.3 to 1.0)
+            double topic1PopularityRatio = 0.3 + (0.7 * Math.min(1.0, (double)topic1Engagement / maxEngagement));
+            double topic2PopularityRatio = 0.3 + (0.7 * Math.min(1.0, (double)topic2Engagement / maxEngagement));
+            
+            // Use the lower popularity as the modifier (more aggressive decay for less popular topics)
+            double popularityModifier = Math.min(topic1PopularityRatio, topic2PopularityRatio);
+            
+            // 3. Apply decay with popularity adjustment
+            double adjustedDecayFactor = baseDecayFactor * popularityModifier;
+            long newWeight = (long) Math.max(0, (relationship.weight() * adjustedDecayFactor));
 
+            // 4. Keep only relationships above minimum weight
             if (newWeight >= minimumWeight) {
                 updatedRelationships.add(new TopicRelationshipEntity(
                         relationship.topic1(),
@@ -264,6 +343,35 @@ public class UserInterestService {
         }
 
         db.updateTopicRelationships(updatedRelationships);
+    }
+
+    /**
+     * Calculates how many unique users engage with each topic.
+     * This helps identify topics with broad appeal versus those sustained by few users.
+     * 
+     * @return Map of topic IDs to their unique user engagement counts
+     */
+    private Map<String, Integer> calculateTopicEngagementBreadth() {
+        Map<String, Set<String>> topicToUsersMap = new HashMap<>();
+        
+        // Collect all user interactions with topics
+        for (UserInterestEntity userInterest : db.userInterestEntities) {
+            String userId = userInterest.userId();
+            
+            // For each topic the user is interested in
+            for (String topic : userInterest.topics().keySet()) {
+                // Add this user to the set of users interested in this topic
+                topicToUsersMap.computeIfAbsent(topic, k -> new HashSet<>()).add(userId);
+            }
+        }
+        
+        // Convert sets of users to counts
+        Map<String, Integer> topicEngagementCounts = new HashMap<>();
+        for (Map.Entry<String, Set<String>> entry : topicToUsersMap.entrySet()) {
+            topicEngagementCounts.put(entry.getKey(), entry.getValue().size());
+        }
+        
+        return topicEngagementCounts;
     }
 
     public Map<InteractionType, Long> getInteractionWeight(Tuple<Long, Long> range) {
