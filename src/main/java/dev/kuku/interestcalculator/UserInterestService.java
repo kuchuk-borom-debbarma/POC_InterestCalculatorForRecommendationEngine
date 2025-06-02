@@ -345,35 +345,6 @@ public class UserInterestService {
         db.updateTopicRelationships(updatedRelationships);
     }
 
-    /**
-     * Calculates how many unique users engage with each topic.
-     * This helps identify topics with broad appeal versus those sustained by few users.
-     * 
-     * @return Map of topic IDs to their unique user engagement counts
-     */
-    private Map<String, Integer> calculateTopicEngagementBreadth() {
-        Map<String, Set<String>> topicToUsersMap = new HashMap<>();
-        
-        // Collect all user interactions with topics
-        for (UserInterestEntity userInterest : db.userInterestEntities) {
-            String userId = userInterest.userId();
-            
-            // For each topic the user is interested in
-            for (String topic : userInterest.topics().keySet()) {
-                // Add this user to the set of users interested in this topic
-                topicToUsersMap.computeIfAbsent(topic, k -> new HashSet<>()).add(userId);
-            }
-        }
-        
-        // Convert sets of users to counts
-        Map<String, Integer> topicEngagementCounts = new HashMap<>();
-        for (Map.Entry<String, Set<String>> entry : topicToUsersMap.entrySet()) {
-            topicEngagementCounts.put(entry.getKey(), entry.getValue().size());
-        }
-        
-        return topicEngagementCounts;
-    }
-
     public Map<InteractionType, Long> getInteractionWeight(Tuple<Long, Long> range) {
         Map<InteractionType, Long> weights = new HashMap<>();
 
