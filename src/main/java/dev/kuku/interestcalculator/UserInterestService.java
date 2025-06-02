@@ -22,6 +22,7 @@ public class UserInterestService {
     private final LLMService llmService;
     private final Helper helper;
 
+    //TODO make this a CRON job that takes in from a user interaction queue
     public void calculateUserInterestScore(Set<UserInteractionData> userInteractions) {
         for (UserInteractionData ui : userInteractions) {
             Map<String, Long> uniqueTopicScores = new HashMap<>();
@@ -60,7 +61,7 @@ public class UserInterestService {
                 });
             }
 
-            // 3. Process cross-topic influences
+            // 3. Add cross-topic influence scores for related topic
             Set<String> usedTopics = new HashSet<>();
             Map<String, Long> crossTopicScores = new HashMap<>();
 
@@ -95,7 +96,7 @@ public class UserInterestService {
                 uniqueTopicScores.merge(entry.getKey(), entry.getValue(), Long::sum);
             }
 
-            // 5. Apply saturation and update scores
+            // 4. Apply saturation and update scores
             Map<String, Tuple<Long, Long>> existingUserInterests = db.getUserInterests(userId);
             Map<String, Tuple<Long, Long>> updatedUserInterests = new HashMap<>(existingUserInterests);
 
@@ -121,7 +122,7 @@ public class UserInterestService {
             // Update the database
             db.updateUserInterests(helper.updateUserInterestsAndReturn(userId, updatedUserInterests));
 
-            // 6. Update topic relationships
+            // 5. Update topic relationships
             Set<Set<String>> topicSets = new HashSet<>();
             for (var interaction : interactions) {
                 ContentTopic contentTopic = db.findContentTopicByContentId(interaction.contentId());
@@ -129,11 +130,11 @@ public class UserInterestService {
                     topicSets.add(new HashSet<>(contentTopic.topics()));
                 }
             }
-
-            updateTopicRelationships(topicSets);
+            //TODO send topicSet to updateTopicRelationships queue
         }
     }
 
+    //TODO make this a CRON job that takes in from a queue
     private void updateTopicRelationships(Set<Set<String>> topicSets) {
         // First decay existing relationships
         decayTopicRelationships(0.9, 5);
@@ -180,6 +181,10 @@ public class UserInterestService {
         }
     }
 
+    /**
+     * Works by getting all the topics, and it's score for the user and then decaying the score based on the time the topic was updated last and current time.
+     * Decaying ensures that topics which are no longer relevant to the user are gradually removed from their interests.
+     */
     public void decayInterestScore(String userId) {
         Map<String, Tuple<Long, Long>> userInterestsMap = db.getUserInterests(userId);
         long currentTime = Instant.now().toEpochMilli();
@@ -195,7 +200,12 @@ public class UserInterestService {
             Long score = entry.getValue()._1();
             Long lastUpdatedTimestamp = entry.getValue()._2();
             long decayedScore = helper.getDecayedScore(currentTime, lastUpdatedTimestamp, score);
-            updatedTopics.put(topic, new Tuple<>(decayedScore, lastUpdatedTimestamp));
+
+            // Only keep topics with non-zero scores
+            if (decayedScore > 0) {
+                updatedTopics.put(topic, new Tuple<>(decayedScore, lastUpdatedTimestamp));
+            }
+            // Topics with zero score will not be added to updatedTopics, effectively removing them
         }
 
         db.updateUserInterests(helper.updateUserInterestsAndReturn(userId, updatedTopics));
