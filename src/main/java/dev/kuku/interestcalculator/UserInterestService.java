@@ -23,6 +23,43 @@ public class UserInterestService {
     private final Helper helper;
 
     //TODO make this a CRON job that takes in from a user interaction queue
+
+    /**
+     * Dynamic User Interest Calculation Algorithm
+     *
+     * This algorithm processes user interactions to build a personalized interest profile that evolves over time.
+     * It balances content personalization with discovery through a multi-step approach:
+     *
+     * 1. Temporal Decay: Applies time-based decay to existing interests to naturally fade outdated preferences.
+     *    Example: A user who showed interest in "Skiing" 3 months ago but hasn't engaged since will see 
+     *    their skiing interest score decay from 850 to 340 points (60% decay), reducing skiing content in their feed.
+     *
+     * 2. Direct Interest Calculation: Analyzes recent user interactions and assigns weighted scores based on engagement depth.
+     *    Example: A user who comments on a "Photography" post (weight: 90) and views a "Travel" post (weight: 10)
+     *    receives 90 points toward Photography and 10 points toward Travel interests.
+     *
+     * 3. Cross-Topic Discovery: Identifies and scores related topics based on established topic relationships.
+     *    Example: When a user engages with "Cooking" content, the system may add 15 points to "Baking" and 
+     *    8 points to "Nutrition" based on topic relationship strengths (0.6 and 0.3 respectively).
+     *
+     * 4. Activity-Based Scaling: Adjusts cross-topic influence based on user activity levels to promote discovery.
+     *    Example: A casual user (low activity) engaging with "Jazz" content will receive a 1.4x multiplier on related 
+     *    topics like "Blues" (21 points instead of 15), while a power user receives only a 0.6x multiplier (9 points).
+     *    This helps casual users discover more diverse content while respecting power users' established preferences.
+     *
+     * 5. Saturation Control: Implements diminishing returns for frequently engaged topics to prevent content tunnel vision.
+     *    Example: For a new interest in "Podcasts" (score: 30), a full 100% of new engagement points are applied.
+     *    For an established interest in "Football" (score: 700), only 30% of new engagement points are applied,
+     *    making it easier for newer interests to gain visibility in the user's content feed.
+     * 
+     * The combined effect of these mechanisms creates a dynamic, self-balancing interest profile that:
+     * - Prioritizes recent engagement while preserving long-term interests
+     * - Facilitates discovery of related content without overwhelming established preferences
+     * - Adapts to changing user interests at an appropriate pace
+     * - Prevents algorithm-induced content bubbles through saturation controls
+     *
+     * @param userInteractions Set of user interaction data to process
+     */
     public void calculateUserInterestScore(Set<UserInteractionData> userInteractions) {
         for (UserInteractionData ui : userInteractions) {
             Map<String, Long> uniqueTopicScores = new HashMap<>();
