@@ -33,7 +33,7 @@ package dev.kuku.interestcalculator.processors.scoreDecay;
  * - Relative rankings remain intact <br>
  * - Fast rebuilding when user returns (boost existing strong interests) <br>
  * - No computational waste during inactive periods (on-demand calculation)
- *
+ * <p>
  * Has to be calculated per interaction
  */
 public class RatioPreservingScoreDecay {

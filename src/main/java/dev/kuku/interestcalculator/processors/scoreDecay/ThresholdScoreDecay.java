@@ -42,7 +42,7 @@ package dev.kuku.interestcalculator.processors.scoreDecay;
  * - Strong preference preservation with flexible control <br>
  * - Natural discovery opportunities without complete reset <br>
  * - Business-configurable engagement lifecycle management
- *
+ * <p>
  * Can be CRON job or on-demand calculation. Preferably CRON to have predictability.
  */
 public class ThresholdScoreDecay {

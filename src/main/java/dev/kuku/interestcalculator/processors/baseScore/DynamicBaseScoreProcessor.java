@@ -1,4 +1,4 @@
-package dev.kuku.interestcalculator.processors.baseScoreProcessor;
+package dev.kuku.interestcalculator.processors.baseScore;
 
 import dev.kuku.interestcalculator.models.InteractionData;
 import dev.kuku.interestcalculator.processors.UserInterestScoreProcessorBase;
