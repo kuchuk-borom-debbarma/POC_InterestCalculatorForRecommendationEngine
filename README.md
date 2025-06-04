@@ -1,116 +1,285 @@
-# User Interest Score Calculator
-*Proof of Concept for Dynamic Content Personalization*
+# User Scoring System
 
 ## Overview
 
-The User Interest Score Calculator is a sophisticated algorithm designed for social media platforms to personalize content delivery based on user behavior patterns. By analyzing interaction history and applying complex weighting mechanisms, it creates dynamic interest profiles that evolve with user preferences over time.
+This system calculates and maintains user interest scores across different topics to personalize content recommendations. It consists of four main components that work together to track user preferences, decay outdated interests, and maintain topic relationships.
 
-## (IGNORE FOR NOW) Logic for determining which user to update the interest of
-In the pipeline we have an event Queue in which the interactions record get stored and popped later in batch for calculating interest of the users. We only want to process users based on activity this will help us avoid calculation topic interest for users that are not active
+## Components
 
-First solution is to use a partitioned database to store high , mid, low activity users
-Then users with same id can be fetched and processed by first selecting the FIRSt user we find and then using it's ID to fetch the other entries that it may have.
+### 1. User Activity Classification
 
-## Core Algorithm: Calculate User Interest Score
-NOTE : The numbers are placeholders and are not realistic.
-### 🎯 Key Components
+A dynamic classification system that categorizes users based on their interaction frequency within specified time periods.
 
-#### 1. **Interaction Weight System**
-*Different actions carry different significance levels*
+#### Classification Algorithm
+**Input:** Time span (from-to date range)  
+**Process:** Analyze user interaction/activity data within the specified period  
+**Output:** Activity level classification
 
-Each user interaction is assigned a weight based on its engagement depth:
+#### Activity Levels
+- **Very Active**: High frequency interactions
+- **Active**: Regular interaction patterns
+- **Moderately Active**: Occasional interactions
+- **Low Active**: Infrequent interactions
+- **Inactive**: Minimal to no interactions
 
-- **Comments & Replies**: `High weight (3.0-5.0)`
-  - Indicates strong engagement and interest
-  - Requires time investment and active participation
-- **Shares & Reposts**: `Medium-High weight (2.5-3.5)`
-  - Shows content resonates enough to share with others
-  - Implies endorsement and topic relevance
-- **Likes & Reactions**: `Medium weight (1.0-2.0)`
-  - Quick engagement indicator
-  - Most common but least committal interaction
-- **Views & Clicks**: `Low weight (0.1-0.5)`
-  - Passive consumption metric
-  - Helps identify browsing patterns
+#### Time Period Classifications
+The system can classify activity across multiple time spans:
+- **Daily Activity**: Last 24 hours interaction pattern
+- **Weekly Activity**: Last 7 days interaction pattern
+- **Monthly Activity**: Last 30 days interaction pattern
+- **Custom Period**: Any specified date range
 
-**Example**: A user commenting on a photography post receives 4.0 points, while simply viewing it adds only 0.2 points to their photography interest score.
+**Purpose:**
+- Scale topic scores inversely to activity level (less active = higher score multiplier)
+- Adjust decay rates based on user engagement patterns
+- Prioritize processing resources for different user segments
 
-#### 2. **User Activity Scaling**
-*Prevents score inflation for heavy users while accelerating discovery for casual users*
+### 2. User Score Matrix
 
-The system dynamically adjusts impact based on overall user activity:
+Core algorithm for calculating and maintaining user topic interest scores with separate positive and negative sentiment tracking.
 
-- **Heavy Users** (>100 interactions/week): `Reduced multiplier (0.7-0.9x)`
-  - Prevents artificial score inflation
-  - Maintains balanced interest distribution
-- **Regular Users** (20–100 interactions/week): `Standard multiplier (1.0x)`
-  - Baseline scoring mechanism
-- **Casual Users** (<20 interactions/week): `Boosted multiplier (1.2-1.5x)`
-  - Speeds up interest pattern detection
-  - Ensures responsive personalization
+#### Process Flow
+1. **Calculate Dynamic Base Score**: Generate score using content discovery, interaction type, and activity scaling
+2. **Sentiment Classification**: Determine if interaction indicates interest or disinterest
+3. **Score Storage**: Update separate interest (0-10) and disinterest (0-10) scores
+4. **Queue Processing**: Send topic set to `topicRelationship queue` for relationship analysis
 
-**Example**: When a casual user likes a cooking video, their cooking interest increases by `1.5 × 1.5 = 2.25 points`, while a heavy user's same action adds only `1.5 × 0.8 = 1.2 points`.
+#### Dynamic Base Score Calculation
 
-#### 3. **Temporal Decay Mechanism**
-*Reduces the influence of outdated interactions while preserving long-term preferences*
+**Formula:**
+```
+Base Score = Content Discovery Weight × Interaction Type Weight × User Activity Scale
+```
 
-Interest scores naturally decay over time to reflect changing preferences:
+**Content Discovery Methods:**
+- **Search**: User actively searched for content (Weight: High)
+- **Recommendation**: System-suggested content (Weight: Medium)
+- **Trending**: Popular/viral content discovery (Weight: Low)
+- **Direct**: Shared/linked content (Weight: Medium-High)
 
-- **Recent interactions** (0–7 days): `No decay (1.0x)`
-- **Moderate age** (1–4 weeks): `Slight decay (0.8-0.9x)`
-- **Older interactions** (1–6 months): `Significant decay (0.3-0.7x)`
-- **Historical data** (6+ months): `Minimal impact (0.1-0.2x)`
+**Interaction Types & Weights:**
+- **Positive Interactions** (Interest):
+    - View/Read: 1.0
+    - Like/Upvote: 2.0
+    - Share: 3.0
+    - Comment (positive): 2.5
+    - Save/Bookmark: 3.5
 
-**Important**: Decay is applied only during interest score calculation, **not** during feed generation. This ensures returning users see familiar content types initially, then adapt based on new interactions. User activity rate is taken into account during calculation to reduce decay for users who do not regularly engage with content.
+- **Negative Interactions** (Disinterest):
+    - Skip/Dismiss: 1.0
+    - Dislike/Downvote: 2.0
+    - Report: 4.0
+    - Block/Hide: 3.0
+    - Comment (negative): 2.0
 
-**Example**: A user who heavily engaged with fitness content 3 months ago will see some fitness posts upon return, but if they don't interact with them, those topics will quickly fade from their feed as decay reduces their historical fitness score.
+#### User Activity Scaling Strategy
 
-#### 4. **Cross-Topic Influence Network**
-*Leverages topic relationships to enhance discovery and relevance through dynamic co-occurrence analysis*
+**Inverse Activity Scaling** - Less active users receive higher score multipliers to compensate for infrequent interactions.
 
-Topics are interconnected through weighted relationships that create cascading score effects. The system maintains a global topic relationship database that continuously evolves based on real-world content patterns.
+**Proposed Scaling Formula:**
+```
+Activity Scale = Base Multiplier / (Activity Level + Smoothing Factor)
+
+Where:
+- Base Multiplier: 10 (adjustable)
+- Smoothing Factor: 1 (prevents division by zero)
+- Activity Level: Normalized activity count (1-10 scale)
+```
+
+**Example Scaling:**
+- **Very Active** (Level 10): Scale = 10/(10+1) = 0.91
+- **Active** (Level 7): Scale = 10/(7+1) = 1.25
+- **Moderately Active** (Level 4): Scale = 10/(4+1) = 2.0
+- **Low Active** (Level 2): Scale = 10/(2+1) = 3.33
+- **Inactive** (Level 1): Scale = 10/(1+1) = 5.0
 
 **Benefits:**
-- **Content Discovery**: Users discover related topics they haven't directly engaged with
-- **Trend Awareness**: Algorithm adapts to emerging topic relationships in real-time
-- **Reduced Cold Start**: New or niche topics gain visibility through established relationships
-- **Natural Evolution**: Topic network evolves organically with user behavior patterns
+- Casual users' scores decay slower due to higher initial scores
+- Prevents casual users from losing all topic relevance during inactive periods
+- Maintains recommendation quality across different user types
 
+#### Dual Score Philosophy
+- **Separate Storage**: Interest (0-10) and Disinterest (0-10) in different columns
+- **Advantages over Combined Scoring (-10 to +10):**
+    - More intuitive for algorithmic processing
+    - Clearer sentiment analysis and debugging
+    - Prevents negative score complications in recommendation algorithms
+    - Allows independent decay rates for positive/negative sentiments
 
-Design idea. This one is a heavy task so it needs to be performed separately. It can make use of a queue from which it processing periodically. The main function to calculate user interest score will push data in this queue.
-The function for this operation will determine the topic's relationship and batch in its current batch and then increment them to existing scores. Then we take the highest and lowest score in the table to normalize the score in specific range.
-We first decay the scores based on time though and then add the score and stuff.
+#### Scheduled Operations (CRON Jobs)
+- **User Topic Score Decay**: Reduces scores over time to reflect changing interests
+- **Topic Relationship Decay**: Weakens topic connections to reflect trend changes
 
-There will be a range, if it exceeds that range it is going viral
+### 3. User Topic Score Decay
 
-##### **Storage and Performance**
+Gradually reduces topic scores over time to account for changing user interests while protecting casual users from losing established preferences.
 
-**Database Structure:**
-- Topic relationships stored in relational database (vector database planned for future)
-- Daily batch updates prevent real-time calculation overhead
-- Automatic cleanup of weak relationships maintains performance
+#### Multi-Tiered Grace Period System
 
-**Scalability Considerations:**
-- Batch processing limits computational load
-- Sliding window prevents indefinite data growth
-- Threshold filtering reduces storage requirements
+**Grace Period Types:**
+- **Recent Interaction Grace**: 7-14 days for recently interacted topics
+- **High Interest Grace**: 30-60 days for topics with scores >7
+- **User Activity Grace**: Extended periods for low-activity users
+- **Seasonal Grace**: Topic-specific periods (e.g., holiday content)
 
-#### 5. **Topic Saturation Control**
-*Prevents interest tunnel vision and encourages content diversity*
+**Implementation:**
+```
+Grace Period = Base Period × Topic Score Multiplier × User Activity Modifier
 
-As users repeatedly engage with similar topics, the rate of score increase diminishes:
+Where:
+- Base Period: 7 days (minimum)
+- Topic Score Multiplier: (Topic Score / 10) × 2
+- User Activity Modifier: Inverse of activity level (1-5x)
+```
 
-**Saturation Levels**:
-- **Fresh Interest** (0–50 interactions): `Full impact (1.0x)`
-- **Developing Interest** (51–150 interactions): `Reduced impact (0.8x)`
-- **Established Interest** (151–500 interactions): `Diminished impact (0.6x)`
-- **Saturated Interest** (500+ interactions): `Minimal impact (0.3x)`
+#### Dynamic Decay Rates
 
-**Benefits**:
-- Prevents algorithmic "rabbit holes"
-- Encourages exploration of new topics
-- Maintains content diversity in user feeds
-- Facilitates natural interest evolution
+**Decay Rate Calculation:**
+```
+Decay Rate = Base Decay Rate × Activity Modifier × Engagement Recency
 
-**Example**: A user who has interacted with 200 cooking posts will see reduced cooking score increases (0.6x) for new cooking interactions, making it easier for other interests (like travel or music) to compete for feed prominence.
+Activity Modifiers:
+- Very Active: 1.5x (faster adaptation to changing interests)
+- Active: 1.2x  
+- Moderately Active: 1.0x (baseline)
+- Low Active: 0.5x (preserve established interests)
+- Inactive: 0.1x (minimal decay to preserve profile)
+```
 
+**Daily Decay Examples:**
+- **Very Active User**: 3% daily decay (rapid interest change detection)
+- **Active User**: 2.4% daily decay
+- **Moderate User**: 2% daily decay (baseline)
+- **Low Active User**: 1% daily decay (preserve interests longer)
+- **Inactive User**: 0.2% daily decay (maintain historical profile)
+
+#### Challenge Resolution: Fake New User Issue
+**Problem:** Long-inactive users return with zero topic scores, losing all historical interest data.
+
+**Solution:** Multi-layered protection system combining grace periods with minimal decay rates ensures topic relevance preservation during extended inactive periods.
+
+### 4. Topic Relationship Graph
+
+Maintains weighted connections between topics based on co-occurrence frequency in user interactions.
+
+#### Topic Relationship Queue
+
+**Queue Structure:**
+- **Input**: Sets of topics from user interactions
+- **Processing**: Asynchronous batch processing of topic combinations
+- **Consumer**: Topic Relationship Calculator service
+- **Output**: Updated topic connection weights in relationship graph
+
+**Queue Benefits:**
+- Decouples real-time user interactions from relationship calculations
+- Enables batch processing for efficiency
+- Handles high-volume topic updates without blocking user experience
+
+#### Weight Calculation with Growth Limiting
+
+**Logarithmic Scaling Implementation:**
+```java
+private long calculateClampedWeight(long currentWeight, long increment) {
+    // Soft cap using logarithmic scaling
+    double scalingFactor = 1.0 / (1.0 + Math.log10(currentWeight + 1));
+    long scaledIncrement = Math.round(increment * scalingFactor);
+    
+    // Hard cap enforcement
+    long newWeight = currentWeight + scaledIncrement;
+    return Math.min(newWeight, HARD_CAP_LIMIT); // e.g., 10000
+}
+```
+
+**Growth Limitation Strategy:**
+- **Soft Cap**: Logarithmic scaling reduces increment effectiveness as weight increases
+- **Hard Cap**: Absolute maximum weight limit prevents any single relationship from dominating
+- **Natural Balance**: Ensures diverse topic representation in recommendation algorithms
+
+#### Processing Workflow
+1. **Batch Collection**: Gather topic sets from interaction queue
+2. **Pair Generation**: Create all possible topic pair combinations
+3. **Weight Updates**: Apply logarithmic scaling to existing relationships
+4. **New Relationships**: Initialize new topic pairs with base weight
+5. **Graph Optimization**: Periodic cleanup of low-weight relationships
+
+### 5. Topic Relationship Decay
+
+Implements dynamic decay rates based on relationship volatility and engagement patterns to reflect real-world trend changes.
+
+#### Velocity-Based Decay Philosophy
+
+The system analyzes topic relationship patterns to determine appropriate decay rates, ensuring that ephemeral trends fade quickly while stable relationships persist.
+
+**Real-World Application:**
+- **Past Trend**: `Fortnite → Gaming` (historically strong, now declining)
+- **Emerging Trend**: `Gaming → GTA` (growing strength)
+- **Stable Relationship**: `Programming → JavaScript` (consistent over time)
+
+#### Advanced Decay Method
+
+**1. Pattern Analysis (Rolling Window)**
+- **Time Windows**: 7-day buckets over 4-week periods
+- **Tracking Metrics**: Co-occurrence frequency, interaction volume, user diversity
+- **Volatility Calculation**: Standard deviation of weekly activity levels
+
+**2. Relationship Classification**
+```
+Volatility Score = StandardDeviation(WeeklyActivity) / Average(WeeklyActivity)
+Recent Activity Ratio = RecentActivity(7days) / HistoricalActivity(21days)
+```
+
+**3. Dynamic Decay Rate Assignment**
+
+| Classification | Volatility | Recent Activity | Daily Decay Rate | Example |
+|---|---|---|---|---|
+| **Viral Trends** | High (>0.8) | Low (<0.5) | 15% | Viral meme topics |
+| **Growing Trends** | Low (<0.3) | High (>1.5) | 1% | Emerging technologies |
+| **Stable Relationships** | Low (<0.3) | Normal (0.8-1.2) | 2% | Core domain connections |
+| **Declining Trends** | Medium (0.3-0.8) | Declining (0.5-0.8) | 8% | Fading interests |
+| **Dormant Topics** | Low (<0.3) | Very Low (<0.3) | 5% | Inactive but preserved |
+
+**4. Cleanup Process**
+- **Minimum Weight Threshold**: ~0.1 (configurable)
+- **Removal Criteria**: Relationships below threshold after decay application
+- **Batch Processing**: Periodic cleanup to maintain graph efficiency
+
+#### Decay Rate Justification
+- **Viral Trends**: Aggressive decay (15%) enables rapid trend transitions
+- **Growing Trends**: Minimal decay (1%) allows organic relationship strengthening
+- **Stable Relationships**: Moderate decay (2%) maintains long-term connections
+- **Declining Trends**: Accelerated decay (8%) facilitates natural fade-out
+
+## Implementation Recommendations
+
+### User Activity Scaling Refinement
+**Suggested Enhancement:**
+```
+Activity Scale = (Base × Consistency Bonus) / (Activity Level + Smoothing)
+
+Where:
+- Consistency Bonus: 1.0-1.5x based on interaction pattern regularity
+- Base: 8-12 (tunable based on system performance)
+- Smoothing Factor: 0.5-2.0 (prevents extreme scaling)
+```
+
+### Grace Period Configuration
+**Recommended Starting Values:**
+- **Base Grace Period**: 7-14 days
+- **High Interest Multiplier**: 2-4x for scores >7
+- **Low Activity Multiplier**: 2-10x based on inactivity duration
+- **Topic Category Modifiers**: 0.5-3x based on content type (news vs. evergreen)
+
+### Minimum Weight Threshold
+**Suggested Implementation:**
+- **Primary Threshold**: 0.1 (relationship removal)
+- **Warning Threshold**: 0.5 (decay monitoring)
+- **Archive Threshold**: 0.05 (historical data retention)
+
+## System Benefits
+
+1. **Adaptive Personalization**: Accounts for different user behavior patterns
+2. **Interest Preservation**: Protects casual users from losing established preferences
+3. **Trend Responsiveness**: Rapidly adapts to changing topic popularity
+4. **Scalable Architecture**: Efficient processing through queue-based design
+5. **Data Integrity**: Prevents loss of valuable historical relationship data
+6. **Balanced Recommendations**: Maintains diverse topic representation across user types
