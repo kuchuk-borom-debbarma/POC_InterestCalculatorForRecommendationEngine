@@ -86,6 +86,8 @@ public class DynamicContentDiscoveryBasedBaseScoreCalculator {
      * @return TopicScoreTuple containing separated interest and disinterest scores
      */
     public TopicScoreTuple execute(UserInteractionsDb.UserInteractionRow userInteraction) {
+        //TODO introduce momentum into play. Compare topic's updatedAt value with current time to determine momentum if possible if not what are the other variable we require to calculate momentum
+
         // Phase 1: Gather multi-horizon activity data
         // We need different time perspectives to understand user behavior patterns
         UserActivityCalculator.ActivityMetrics dailyActivity = userActivityCalculator.getDailyActivityFromNow(userInteraction.userId);
