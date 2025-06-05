@@ -37,6 +37,7 @@ The system can classify activity across multiple time spans:
 ### 2. User Score Matrix
 
 Core algorithm for calculating and maintaining user topic interest scores with separate positive and negative sentiment tracking.
+suggestion :- how popular the user is on the platform, drop user activity scaling if its complex at start
 
 #### Process Flow
 1. **Calculate Dynamic Base Score**: Generate score using content discovery, interaction type, and activity scaling
@@ -120,7 +121,6 @@ Gradually reduces topic scores over time to account for changing user interests 
 - **Recent Interaction Grace**: 7-14 days for recently interacted topics
 - **High Interest Grace**: 30-60 days for topics with scores >7
 - **User Activity Grace**: Extended periods for low-activity users
-- **Seasonal Grace**: Topic-specific periods (e.g., holiday content)
 
 **Implementation:**
 ```

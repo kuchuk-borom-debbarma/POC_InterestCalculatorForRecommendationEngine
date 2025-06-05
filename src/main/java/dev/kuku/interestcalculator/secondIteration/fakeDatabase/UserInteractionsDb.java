@@ -20,7 +20,18 @@ public class UserInteractionsDb {
         public String contentId;
         public Discovery contentDiscovery;
         public InteractionType interactionType;
+        public long interactionTime;
     }
 
     private final List<UserInteractionRow> userInteractionRows = new ArrayList<>();
+
+    public List<UserInteractionRow> getInteractionsOfUserFromTo(String userId, long from, long to) {
+        List<UserInteractionRow> result = new ArrayList<>();
+        for (UserInteractionRow interaction : userInteractionRows) {
+            if (interaction.userId.equals(userId) && interaction.interactionTime >= from && interaction.interactionTime <= to) {
+                result.add(interaction);
+            }
+        }
+        return result;
+    }
 }
