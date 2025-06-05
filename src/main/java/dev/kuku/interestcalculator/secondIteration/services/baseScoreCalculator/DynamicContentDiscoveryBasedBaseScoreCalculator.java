@@ -50,6 +50,8 @@ import org.springframework.stereotype.Service;
  * interest-calculator.scoring.interaction.comment-weight=2.0
  * interest-calculator.scoring.activity.daily-weight=0.5
  * interest-calculator.scoring.multiplier.min-multiplier=0.3
+ * interest-calculator.scoring.saturation.saturation-factor=1.0
+ * interest-calculator.scoring.saturation.enabled=true
  * <p>
  * See InterestCalculatorConfig class for all available configuration options.
  */
@@ -69,11 +71,16 @@ public class DynamicContentDiscoveryBasedBaseScoreCalculator {
      * 1. Gather INTERACTING USER's activity data across multiple time horizons
      * 2. Calculate base score and interaction weight
      * 3. Apply INTERACTING USER's activity-based normalization to balance score accumulation
-     * 4. Segregate into interest/disinterest scores
+     * 4. Segregate into interest/disinterest scores and apply saturation control to each
      * <p>
      * The activity normalization ensures that:
      * - Active users (who interact frequently) get lower per-interaction scores to prevent dominance
      * - Casual users (who interact rarely) get higher per-interaction scores to survive decay
+     * <p>
+     * The saturation control ensures that:
+     * - Both interest and disinterest scores become progressively harder to increase as they approach 10
+     * - Prevents runaway score accumulation in either direction
+     * - Creates natural ceiling effects for both positive and negative sentiment signals
      *
      * @param userInteraction The interaction event to score (userId field determines whose activity is analyzed)
      * @return TopicScoreTuple containing separated interest and disinterest scores
@@ -84,35 +91,67 @@ public class DynamicContentDiscoveryBasedBaseScoreCalculator {
         UserActivityCalculator.ActivityMetrics dailyActivity = userActivityCalculator.getDailyActivityFromNow(userInteraction.userId);
         UserActivityCalculator.ActivityMetrics monthlyActivity = userActivityCalculator.getMonthlyActivityFromNow(userInteraction.userId);
         UserActivityCalculator.ActivityMetrics yearlyActivity = userActivityCalculator.getYearlyActivityFromNow(userInteraction.userId);
-
         // Phase 2: Calculate raw interaction score
         // This represents the "face value" of the interaction before normalization
         double baseScore = getBaseScore(userInteraction.contentDiscovery);
         double interactionWeight = getInteractionWeight(userInteraction.interactionType);
         double finalRawScore = baseScore * interactionWeight;
-
         // Phase 3: Apply activity-based normalization
         // This is where we account for user behavior patterns to ensure fairness
         double activityMultiplier = calculateCompositeInverseMultiplier(dailyActivity, monthlyActivity, yearlyActivity);
-
-        // Phase 4: Apply multiplier and segregate scores
-        // Separate positive (interest) and negative (disinterest) signals
+        double normalizedScore = finalRawScore * activityMultiplier;
+        // Phase 4: Segregate and apply saturation control
+        // Separate positive (interest) and negative (disinterest) signals, then apply saturation
         double interestScore = 0;
         double disinterestScore = 0;
-
-        if (finalRawScore < 0) {
-            // Negative interactions become disinterest scores
-            disinterestScore = finalRawScore * activityMultiplier;
+        if (normalizedScore < 0) {
+            // Negative interactions become disinterest scores (convert to positive 0-10 range)
+            double positiveDisinterestScore = Math.abs(normalizedScore);
+            disinterestScore = applySaturationControl(positiveDisinterestScore);
         } else {
             // Positive interactions become interest scores
-            interestScore = finalRawScore * activityMultiplier;
+            interestScore = applySaturationControl(normalizedScore);
         }
-
         // Return segregated scores for independent processing
         var finalTopicScore = new TopicScoreTuple();
         finalTopicScore.interestScore = interestScore;
         finalTopicScore.disinterestScore = disinterestScore;
         return finalTopicScore;
+    }
+
+    /**
+     * Applies saturation control to prevent runaway score accumulation.
+     * <p>
+     * This method implements a logarithmic saturation function that creates progressive
+     * resistance as scores approach the configured maximum (topicScoreMax). Since both
+     * interest and disinterest scores are stored in the 0-10 range, this function:
+     * - Makes it progressively harder to increase scores as they get higher
+     * - Creates natural ceiling effects without hard limits
+     * - Maintains meaningful score differentiation across the entire 0-10 range
+     * - Applies the same saturation curve to both interest and disinterest scores
+     * <p>
+     * Mathematical approach:
+     * Uses a hyperbolic tangent (tanh) function that maps unlimited input to bounded output:
+     * - Asymptotically approaches topicScoreMax (default: 10)
+     * - Steepness controlled by saturation factor (higher = more aggressive saturation)
+     * <p>
+     * Formula: topicScoreMax × tanh(score × saturationFactor / topicScoreMax)
+     *
+     * @param score The score before saturation control (always positive, 0+ range)
+     * @return Score with saturation control applied, bounded within 0 to topicScoreMax
+     */
+    private double applySaturationControl(double score) {
+        // If saturation is disabled, return score as-is
+        if (!config.getScoring().getSaturation().isEnabled()) {
+            return score;
+        }
+        if (score <= 0) return 0;
+        double maxScore = config.getTopicScoreMax();
+        double saturationFactor = config.getScoring().getSaturation().getSaturationFactor();
+        // Apply saturation - asymptotically approach maxScore
+        // Formula: maxScore × tanh(score × saturationFactor / maxScore)
+        double normalizedInput = score * saturationFactor / maxScore;
+        return maxScore * Math.tanh(normalizedInput);
     }
 
     /**
@@ -138,7 +177,6 @@ public class DynamicContentDiscoveryBasedBaseScoreCalculator {
             UserActivityCalculator.ActivityMetrics dailyActivity,
             UserActivityCalculator.ActivityMetrics monthlyActivity,
             UserActivityCalculator.ActivityMetrics yearlyActivity) {
-
         // Calculate individual inverse multipliers for each time period
         // Each period has different interaction volume expectations
         double dailyMultiplier = calculateSinglePeriodInverseMultiplier(
@@ -146,19 +184,16 @@ public class DynamicContentDiscoveryBasedBaseScoreCalculator {
                 dailyActivity.dailyAverage(),
                 config.getScoring().getMaxScale().getDailyMax()
         );
-
         double monthlyMultiplier = calculateSinglePeriodInverseMultiplier(
                 monthlyActivity.totalInteractions(),
                 monthlyActivity.dailyAverage(),
                 config.getScoring().getMaxScale().getMonthlyMax()
         );
-
         double yearlyMultiplier = calculateSinglePeriodInverseMultiplier(
                 yearlyActivity.totalInteractions(),
                 yearlyActivity.dailyAverage(),
                 config.getScoring().getMaxScale().getYearlyMax()
         );
-
         // Combine multipliers using configurable weighted average
         // This creates a nuanced multiplier that considers all time horizons
         return (dailyMultiplier * config.getScoring().getActivity().getDailyWeight()) +
@@ -191,27 +226,22 @@ public class DynamicContentDiscoveryBasedBaseScoreCalculator {
     private double calculateSinglePeriodInverseMultiplier(int totalInteractions, double dailyAverage, int maxScale) {
         // Handle complete inactivity - give maximum boost to rare interactions
         if (totalInteractions == 0) return config.getScoring().getMultiplier().getMaxMultiplier();
-
         // Normalize total interactions to 0-1 scale based on expected maximum for this time period
         // This allows us to compare activity levels across different time horizons
         double normalizedTotal = Math.min(1.0, (double) totalInteractions / maxScale);
-
         // Normalize daily average to 0-1 scale
         // Daily average helps us understand consistency vs. burst behavior
         double maxDailyForScale = (double) maxScale / config.getScoring().getMaxScale().getDaysInMonth();
         double normalizedDaily = Math.min(1.0, dailyAverage / maxDailyForScale);
-
         // Combine total volume and daily consistency using configurable weights
         double activityScore = (normalizedTotal * config.getScoring().getComposition().getTotalInteractionsWeight()) +
                 (normalizedDaily * config.getScoring().getComposition().getDailyAverageWeight());
-
         // Apply inverse relationship with configurable range
         // Formula: maxMultiplier - (activityScore × multiplierRange)
         // - activityScore = 0 (inactive) → multiplier = maxMultiplier
         // - activityScore = 1 (very active) → multiplier = minMultiplier
         double multiplier = config.getScoring().getMultiplier().getMaxMultiplier() -
                 (activityScore * config.getScoring().getMultiplier().getMultiplierRange());
-
         // Ensure multiplier stays within configured bounds
         return Math.max(config.getScoring().getMultiplier().getMinMultiplier(),
                 Math.min(config.getScoring().getMultiplier().getMaxMultiplier(), multiplier));

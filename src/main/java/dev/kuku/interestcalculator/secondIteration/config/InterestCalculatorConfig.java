@@ -1,6 +1,5 @@
 package dev.kuku.interestcalculator.secondIteration.config;
 
-
 import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
@@ -72,6 +71,11 @@ public class InterestCalculatorConfig {
          * Activity composition weights
          */
         private CompositionConfig composition = new CompositionConfig();
+
+        /**
+         * Score saturation control configuration
+         */
+        private SaturationConfig saturation = new SaturationConfig();
 
         @Data
         public static class DiscoveryConfig {
@@ -187,6 +191,27 @@ public class InterestCalculatorConfig {
              * Weight for daily average in activity score calculation
              */
             private double dailyAverageWeight = 0.3;
+        }
+
+        @Data
+        public static class SaturationConfig {
+            /**
+             * Saturation factor controlling how aggressively scores approach boundaries.
+             * Higher values create more aggressive saturation (faster approach to limits).
+             * Lower values create gentler saturation (slower approach to limits).
+             *
+             * Typical values:
+             * - 0.5: Very gentle saturation, scores can grow quite high before significant resistance
+             * - 1.0: Moderate saturation, balanced approach
+             * - 2.0: Aggressive saturation, strong resistance as scores increase
+             */
+            private double saturationFactor = 1.0;
+
+            /**
+             * Whether saturation control is enabled.
+             * When disabled, scores can grow without bounds (not recommended for production).
+             */
+            private boolean enabled = true;
         }
     }
 }
