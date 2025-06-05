@@ -1,4 +1,4 @@
-package dev.kuku.interestcalculator.secondIteration.models;
+package dev.kuku.interestcalculator.models;
 
 public class TopicScoreTuple {
     public double interestScore;

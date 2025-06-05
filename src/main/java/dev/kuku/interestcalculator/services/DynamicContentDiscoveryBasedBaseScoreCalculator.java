@@ -1,9 +1,8 @@
-package dev.kuku.interestcalculator.secondIteration.services.baseScoreCalculator;
+package dev.kuku.interestcalculator.services;
 
-import dev.kuku.interestcalculator.secondIteration.config.InterestCalculatorConfig;
-import dev.kuku.interestcalculator.secondIteration.fakeDatabase.UserInteractionsDb;
-import dev.kuku.interestcalculator.secondIteration.models.TopicScoreTuple;
-import dev.kuku.interestcalculator.secondIteration.services.UserActivityCalculator;
+import dev.kuku.interestcalculator.config.InterestCalculatorConfig;
+import dev.kuku.interestcalculator.fakeDatabase.UserInteractionsDb;
+import dev.kuku.interestcalculator.models.TopicScoreTuple;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 

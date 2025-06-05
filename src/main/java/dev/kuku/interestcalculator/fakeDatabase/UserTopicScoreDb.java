@@ -1,4 +1,4 @@
-package dev.kuku.interestcalculator.secondIteration.fakeDatabase;
+package dev.kuku.interestcalculator.fakeDatabase;
 
 
 import lombok.AllArgsConstructor;

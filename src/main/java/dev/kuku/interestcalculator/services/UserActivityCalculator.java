@@ -1,6 +1,6 @@
-package dev.kuku.interestcalculator.secondIteration.services;
+package dev.kuku.interestcalculator.services;
 
-import dev.kuku.interestcalculator.secondIteration.fakeDatabase.UserInteractionsDb;
+import dev.kuku.interestcalculator.fakeDatabase.UserInteractionsDb;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;

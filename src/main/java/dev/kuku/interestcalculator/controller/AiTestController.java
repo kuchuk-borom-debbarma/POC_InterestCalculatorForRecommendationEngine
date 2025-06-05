@@ -1,6 +1,6 @@
 package dev.kuku.interestcalculator.controller;
 
-import dev.kuku.interestcalculator.LLMService;
+import dev.kuku.interestcalculator.services.LLMService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;

@@ -1,4 +1,4 @@
-package dev.kuku.interestcalculator.secondIteration.config;
+package dev.kuku.interestcalculator.config;
 
 import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;

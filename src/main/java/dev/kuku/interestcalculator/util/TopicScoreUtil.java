@@ -1,7 +1,7 @@
-package dev.kuku.interestcalculator.secondIteration.util;
+package dev.kuku.interestcalculator.util;
 
 
-import dev.kuku.interestcalculator.secondIteration.models.TopicScoreTuple;
+import dev.kuku.interestcalculator.models.TopicScoreTuple;
 
 import java.util.Map;
 
