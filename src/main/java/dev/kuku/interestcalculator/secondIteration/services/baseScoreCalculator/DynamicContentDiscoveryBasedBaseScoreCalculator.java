@@ -1,12 +1,10 @@
 package dev.kuku.interestcalculator.secondIteration.services.baseScoreCalculator;
 
+import dev.kuku.interestcalculator.secondIteration.config.InterestCalculatorConfig;
 import dev.kuku.interestcalculator.secondIteration.fakeDatabase.UserInteractionsDb;
 import dev.kuku.interestcalculator.secondIteration.models.TopicScoreTuple;
 import dev.kuku.interestcalculator.secondIteration.services.UserActivityCalculator;
-import lombok.Data;
 import lombok.RequiredArgsConstructor;
-import org.springframework.boot.context.properties.ConfigurationProperties;
-import org.springframework.stereotype.Component;
 import org.springframework.stereotype.Service;
 
 /**
@@ -23,197 +21,43 @@ import org.springframework.stereotype.Service;
  * The algorithm works in four main phases:
  * <p>
  * 1. BASE SCORE CALCULATION (Content Discovery Context)
- *    - Assigns different base values based on HOW content was discovered
- *    - Reflects user intent and engagement likelihood
+ * - Assigns different base values based on HOW content was discovered
+ * - Reflects user intent and engagement likelihood
  * <p>
  * 2. INTERACTION WEIGHTING (User Action Significance)
- *    - Multiplies base score by interaction type weight
- *    - Positive weights indicate interest, negative indicate disinterest
+ * - Multiplies base score by interaction type weight
+ * - Positive weights indicate interest, negative indicate disinterest
  * <p>
  * 3. ACTIVITY-BASED NORMALIZATION (Temporal Context)
- *    - Applies inverse activity multiplier to balance scoring across user types
- *    - Prevents power users from dominating interest profiles
+ * - Applies inverse activity multiplier to balance scoring across user types
+ * - Prevents power users from dominating interest profiles
  * <p>
  * 4. SCORE SEGREGATION (Interest vs Disinterest)
- *    - Separates positive and negative scores into distinct metrics
- *    - Allows for independent tracking of interests and dislikes
+ * - Separates positive and negative scores into distinct metrics
+ * - Allows for independent tracking of interests and dislikes
  * <p>
  * ===================================================================================
  * CONFIGURATION PROPERTIES
  * ===================================================================================
  * <p>
  * All algorithm parameters can be configured via application.properties using the prefix:
- * 'interest-calculator.scoring'
+ * 'interest-calculator'
  * <p>
  * Example configuration:
+ * interest-calculator.topic-score-min=0
+ * interest-calculator.topic-score-max=10
  * interest-calculator.scoring.discovery.search-score=4.0
  * interest-calculator.scoring.interaction.comment-weight=2.0
  * interest-calculator.scoring.activity.daily-weight=0.5
  * interest-calculator.scoring.multiplier.min-multiplier=0.3
  * <p>
- * See ScoreCalculatorConfig inner class for all available configuration options.
+ * See InterestCalculatorConfig class for all available configuration options.
  */
 @Service
 @RequiredArgsConstructor
 public class DynamicContentDiscoveryBasedBaseScoreCalculator {
     private final UserActivityCalculator userActivityCalculator;
-    private final ScoreCalculatorConfig config;
-
-    /**
-     * Configuration class for all scoring algorithm parameters.
-     * Uses Spring Boot's @ConfigurationProperties for easy configuration management.
-     */
-    @Data
-    @Component
-    @ConfigurationProperties(prefix = "interest-calculator.scoring")
-    public static class ScoreCalculatorConfig {
-
-        /**
-         * Content discovery method base scores
-         */
-        private DiscoveryConfig discovery = new DiscoveryConfig();
-
-        /**
-         * Interaction type weights
-         */
-        private InteractionConfig interaction = new InteractionConfig();
-
-        /**
-         * Time horizon weights for activity calculation
-         */
-        private ActivityConfig activity = new ActivityConfig();
-
-        /**
-         * Activity multiplier configuration
-         */
-        private MultiplierConfig multiplier = new MultiplierConfig();
-
-        /**
-         * Expected maximum interactions for different time periods
-         */
-        private MaxScaleConfig maxScale = new MaxScaleConfig();
-
-        /**
-         * Activity composition weights
-         */
-        private CompositionConfig composition = new CompositionConfig();
-
-        @Data
-        public static class DiscoveryConfig {
-            /**
-             * Base score for content discovered through search (highest intent)
-             */
-            private double searchScore = 4.0;
-
-            /**
-             * Base score for trending content (medium intent)
-             */
-            private double trendingScore = 3.0;
-
-            /**
-             * Base score for recommended content (lower intent)
-             */
-            private double recommendationScore = 2.0;
-        }
-
-        @Data
-        public static class InteractionConfig {
-            /**
-             * Weight for comment interactions (highest positive engagement)
-             */
-            private double commentWeight = 2.0;
-
-            /**
-             * Weight for like interactions (moderate positive engagement)
-             */
-            private double likeWeight = 1.0;
-
-            /**
-             * Weight for dislike interactions (moderate negative engagement)
-             */
-            private double dislikeWeight = -1.0;
-
-            /**
-             * Weight for report interactions (highest negative engagement)
-             */
-            private double reportWeight = -2.0;
-        }
-
-        @Data
-        public static class ActivityConfig {
-            /**
-             * Weight for daily activity in composite calculation (most important)
-             */
-            private double dailyWeight = 0.5;
-
-            /**
-             * Weight for monthly activity in composite calculation (medium importance)
-             */
-            private double monthlyWeight = 0.3;
-
-            /**
-             * Weight for yearly activity in composite calculation (least important)
-             */
-            private double yearlyWeight = 0.2;
-        }
-
-        @Data
-        public static class MultiplierConfig {
-            /**
-             * Maximum activity multiplier for inactive users
-             */
-            private double maxMultiplier = 2.0;
-
-            /**
-             * Minimum activity multiplier for very active users
-             */
-            private double minMultiplier = 0.3;
-
-            /**
-             * Multiplier range (maxMultiplier - minMultiplier)
-             * Calculated automatically based on max and min values
-             */
-            public double getMultiplierRange() {
-                return maxMultiplier - minMultiplier;
-            }
-        }
-
-        @Data
-        public static class MaxScaleConfig {
-            /**
-             * Expected maximum interactions per day for highly active users
-             */
-            private int dailyMax = 20;
-
-            /**
-             * Expected maximum interactions per month for highly active users
-             */
-            private int monthlyMax = 300;
-
-            /**
-             * Expected maximum interactions per year for highly active users
-             */
-            private int yearlyMax = 2000;
-
-            /**
-             * Days in a month for daily average calculations
-             */
-            private int daysInMonth = 30;
-        }
-
-        @Data
-        public static class CompositionConfig {
-            /**
-             * Weight for total interactions in activity score calculation
-             */
-            private double totalInteractionsWeight = 0.7;
-
-            /**
-             * Weight for daily average in activity score calculation
-             */
-            private double dailyAverageWeight = 0.3;
-        }
-    }
+    private final InterestCalculatorConfig config;
 
     /**
      * Main execution method that orchestrates the complete interest scoring process.
@@ -285,9 +129,9 @@ public class DynamicContentDiscoveryBasedBaseScoreCalculator {
      * - Monthly: Represents medium-term behavioral patterns and sustained interests
      * - Yearly: Reflects long-term user personality and fundamental preferences
      *
-     * @param dailyActivity User's interaction patterns in the last 24 hours
+     * @param dailyActivity   User's interaction patterns in the last 24 hours
      * @param monthlyActivity User's interaction patterns in the last 30 days
-     * @param yearlyActivity User's interaction patterns in the last 365 days
+     * @param yearlyActivity  User's interaction patterns in the last 365 days
      * @return Composite multiplier between configured min and max values
      */
     private double calculateCompositeInverseMultiplier(
@@ -300,26 +144,26 @@ public class DynamicContentDiscoveryBasedBaseScoreCalculator {
         double dailyMultiplier = calculateSinglePeriodInverseMultiplier(
                 dailyActivity.totalInteractions(),
                 dailyActivity.dailyAverage(),
-                config.getMaxScale().getDailyMax()
+                config.getScoring().getMaxScale().getDailyMax()
         );
 
         double monthlyMultiplier = calculateSinglePeriodInverseMultiplier(
                 monthlyActivity.totalInteractions(),
                 monthlyActivity.dailyAverage(),
-                config.getMaxScale().getMonthlyMax()
+                config.getScoring().getMaxScale().getMonthlyMax()
         );
 
         double yearlyMultiplier = calculateSinglePeriodInverseMultiplier(
                 yearlyActivity.totalInteractions(),
                 yearlyActivity.dailyAverage(),
-                config.getMaxScale().getYearlyMax()
+                config.getScoring().getMaxScale().getYearlyMax()
         );
 
         // Combine multipliers using configurable weighted average
         // This creates a nuanced multiplier that considers all time horizons
-        return (dailyMultiplier * config.getActivity().getDailyWeight()) +
-                (monthlyMultiplier * config.getActivity().getMonthlyWeight()) +
-                (yearlyMultiplier * config.getActivity().getYearlyWeight());
+        return (dailyMultiplier * config.getScoring().getActivity().getDailyWeight()) +
+                (monthlyMultiplier * config.getScoring().getActivity().getMonthlyWeight()) +
+                (yearlyMultiplier * config.getScoring().getActivity().getYearlyWeight());
     }
 
     /**
@@ -340,13 +184,13 @@ public class DynamicContentDiscoveryBasedBaseScoreCalculator {
      * 4. Constrain result to configurable bounds
      *
      * @param totalInteractions Total interactions in the period
-     * @param dailyAverage Average interactions per day in the period
-     * @param maxScale Expected maximum interactions for this time period
+     * @param dailyAverage      Average interactions per day in the period
+     * @param maxScale          Expected maximum interactions for this time period
      * @return Inverse multiplier between configured min and max values
      */
     private double calculateSinglePeriodInverseMultiplier(int totalInteractions, double dailyAverage, int maxScale) {
         // Handle complete inactivity - give maximum boost to rare interactions
-        if (totalInteractions == 0) return config.getMultiplier().getMaxMultiplier();
+        if (totalInteractions == 0) return config.getScoring().getMultiplier().getMaxMultiplier();
 
         // Normalize total interactions to 0-1 scale based on expected maximum for this time period
         // This allows us to compare activity levels across different time horizons
@@ -354,23 +198,23 @@ public class DynamicContentDiscoveryBasedBaseScoreCalculator {
 
         // Normalize daily average to 0-1 scale
         // Daily average helps us understand consistency vs. burst behavior
-        double maxDailyForScale = (double) maxScale / config.getMaxScale().getDaysInMonth();
+        double maxDailyForScale = (double) maxScale / config.getScoring().getMaxScale().getDaysInMonth();
         double normalizedDaily = Math.min(1.0, dailyAverage / maxDailyForScale);
 
         // Combine total volume and daily consistency using configurable weights
-        double activityScore = (normalizedTotal * config.getComposition().getTotalInteractionsWeight()) +
-                (normalizedDaily * config.getComposition().getDailyAverageWeight());
+        double activityScore = (normalizedTotal * config.getScoring().getComposition().getTotalInteractionsWeight()) +
+                (normalizedDaily * config.getScoring().getComposition().getDailyAverageWeight());
 
         // Apply inverse relationship with configurable range
         // Formula: maxMultiplier - (activityScore × multiplierRange)
         // - activityScore = 0 (inactive) → multiplier = maxMultiplier
         // - activityScore = 1 (very active) → multiplier = minMultiplier
-        double multiplier = config.getMultiplier().getMaxMultiplier() -
-                (activityScore * config.getMultiplier().getMultiplierRange());
+        double multiplier = config.getScoring().getMultiplier().getMaxMultiplier() -
+                (activityScore * config.getScoring().getMultiplier().getMultiplierRange());
 
         // Ensure multiplier stays within configured bounds
-        return Math.max(config.getMultiplier().getMinMultiplier(),
-                Math.min(config.getMultiplier().getMaxMultiplier(), multiplier));
+        return Math.max(config.getScoring().getMultiplier().getMinMultiplier(),
+                Math.min(config.getScoring().getMultiplier().getMaxMultiplier(), multiplier));
     }
 
     /**
@@ -384,9 +228,9 @@ public class DynamicContentDiscoveryBasedBaseScoreCalculator {
      */
     private double getBaseScore(UserInteractionsDb.Discovery contentDiscovery) {
         return switch (contentDiscovery) {
-            case SEARCH -> config.getDiscovery().getSearchScore();
-            case TRENDING -> config.getDiscovery().getTrendingScore();
-            case RECOMMENDATION -> config.getDiscovery().getRecommendationScore();
+            case SEARCH -> config.getScoring().getDiscovery().getSearchScore();
+            case TRENDING -> config.getScoring().getDiscovery().getTrendingScore();
+            case RECOMMENDATION -> config.getScoring().getDiscovery().getRecommendationScore();
         };
     }
 
@@ -401,10 +245,10 @@ public class DynamicContentDiscoveryBasedBaseScoreCalculator {
      */
     private double getInteractionWeight(UserInteractionsDb.InteractionType interactionType) {
         return switch (interactionType) {
-            case COMMENT -> config.getInteraction().getCommentWeight();
-            case LIKE -> config.getInteraction().getLikeWeight();
-            case DISLIKE -> config.getInteraction().getDislikeWeight();
-            case REPORT -> config.getInteraction().getReportWeight();
+            case COMMENT -> config.getScoring().getInteraction().getCommentWeight();
+            case LIKE -> config.getScoring().getInteraction().getLikeWeight();
+            case DISLIKE -> config.getScoring().getInteraction().getDislikeWeight();
+            case REPORT -> config.getScoring().getInteraction().getReportWeight();
         };
     }
 }
