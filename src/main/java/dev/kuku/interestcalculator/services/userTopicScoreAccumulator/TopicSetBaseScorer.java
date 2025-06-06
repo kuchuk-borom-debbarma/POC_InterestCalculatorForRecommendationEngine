@@ -38,7 +38,6 @@ public class TopicSetBaseScorer {
             case SEARCH -> SEARCH_MULTIPLIER;
             case TRENDING -> TRENDING_MULTIPLIER;
             case RECOMMENDATION -> RECOMMENDATION_MULTIPLIER;
-            default -> 1.0;
         };
     }
 

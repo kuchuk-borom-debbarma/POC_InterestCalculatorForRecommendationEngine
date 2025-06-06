@@ -11,8 +11,8 @@ import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.ollama.api.OllamaOptions;
 import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -89,21 +89,21 @@ public class LLMService {
             String topicsResponse = getTopicFromResponse(response);
 
             // Split by comma and clean up each topic
-            List<String> extractedTopics = Arrays.stream(topicsResponse.split(","))
+            Set<String> extractedTopics = Arrays.stream(topicsResponse.split(","))
                     .map(String::trim)
                     .filter(topic -> !topic.isEmpty())
                     .limit(maxTopics)
-                    .collect(Collectors.toList());
+                    .collect(Collectors.toSet());
 
             log.info("Extracted topics: {}", extractedTopics);
 
             // Return extracted topics or empty list if none were found
-            return extractedTopics.isEmpty() ? new ArrayList<>() : extractedTopics;
+            return extractedTopics.isEmpty() ? new HashSet<>() : extractedTopics;
 
         } catch (Exception e) {
             log.error("Error extracting topics: {}", e.getMessage(), e);
             // In case of failure, return a single generic topic to avoid breaking the application
-            return List.of("general");
+            return Set.of("general");
         }
     }
 }

@@ -2,7 +2,6 @@ package dev.kuku.interestcalculator.fakeDatabase;
 
 
 import lombok.AllArgsConstructor;
-import lombok.Getter;
 import org.springframework.stereotype.Repository;
 
 import java.util.ArrayList;
