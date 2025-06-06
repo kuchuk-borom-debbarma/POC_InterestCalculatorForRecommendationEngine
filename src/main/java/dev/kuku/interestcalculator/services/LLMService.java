@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -23,6 +24,24 @@ public class LLMService {
     private static final int maxTopics = 100;
     private final ChatModel chatModel;
 
+    private static String getTopicFromResponse(ChatResponse response) {
+        String topicsResponse = response.getResult().getOutput().getText().trim();
+
+        // Strip out any explanatory text before the actual list
+        if (topicsResponse.contains("\n")) {
+            // If there are line breaks, take only what comes after the last one
+            topicsResponse = topicsResponse.substring(topicsResponse.lastIndexOf("\n")).trim();
+        }
+
+        // Remove any prefixes like "1.", "- ", etc.
+        topicsResponse = topicsResponse.replaceAll("^[0-9]+\\.\\s*", "")
+                .replaceAll("^-\\s*", "");
+
+        // Remove any "topics:" prefix
+        topicsResponse = topicsResponse.replaceAll("(?i)^.*topics:?\\s*", "");
+        return topicsResponse;
+    }
+
     /**
      * Extracts relevant topics from content data by using an LLM.
      * This method prioritizes selecting from existing topics when possible,
@@ -30,9 +49,9 @@ public class LLMService {
      *
      * @param existingTopics List of existing topics to prioritize matching against
      * @param contentData    The content text to analyze
-     * @return List of up to 3 topics that best describe the content
+     * @return Set of up to 3 topics that best describe the content
      */
-    public List<String> getTopics(List<String> existingTopics, String contentData) {
+    public Set<String> getTopics(Set<String> existingTopics, String contentData) {
         try {
             // Truncate content if too large to avoid token limits
             String truncatedContent = contentData.length() > 2000
@@ -42,8 +61,8 @@ public class LLMService {
             // Update the system message to be more explicit
             Message systemMessage = new SystemMessage(
                     "Extract specific, detailed topics from content. Prioritize existing topics when relevant. " +
-                    "Identify nuanced topics based on subject matter, emotions, scenarios, and context. " +
-                    "Return ONLY a comma-separated list of topics. NO EXPLANATIONS, NO NUMBERING, NO HEADERS."
+                            "Identify nuanced topics based on subject matter, emotions, scenarios, and context. " +
+                            "Return ONLY a comma-separated list of topics. NO EXPLANATIONS, NO NUMBERING, NO HEADERS."
             );
 
 
@@ -86,23 +105,5 @@ public class LLMService {
             // In case of failure, return a single generic topic to avoid breaking the application
             return List.of("general");
         }
-    }
-
-    private static String getTopicFromResponse(ChatResponse response) {
-        String topicsResponse = response.getResult().getOutput().getText().trim();
-
-        // Strip out any explanatory text before the actual list
-        if (topicsResponse.contains("\n")) {
-            // If there are line breaks, take only what comes after the last one
-            topicsResponse = topicsResponse.substring(topicsResponse.lastIndexOf("\n")).trim();
-        }
-
-        // Remove any prefixes like "1.", "- ", etc.
-        topicsResponse = topicsResponse.replaceAll("^[0-9]+\\.\\s*", "")
-                                       .replaceAll("^-\\s*", "");
-
-        // Remove any "topics:" prefix
-        topicsResponse = topicsResponse.replaceAll("(?i)^.*topics:?\\s*", "");
-        return topicsResponse;
     }
 }

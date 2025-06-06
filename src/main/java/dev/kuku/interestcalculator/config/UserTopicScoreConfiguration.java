@@ -10,15 +10,11 @@ import org.springframework.stereotype.Component;
 @Component
 @ConfigurationProperties(prefix = "user-topic-score")
 public class UserTopicScoreConfiguration {
-    /**
-     * Minimum allowed topic score value
-     */
-    private double topicScoreMin = 0.0;
 
     /**
      * Maximum allowed topic score value
      */
-    private double topicScoreMax = 10.0;
+    private double topicScoreMax = 100.0;
 
     private UserTopicScoreAccumulatorConfig accumulator = new UserTopicScoreAccumulatorConfig();
     private UserTopicScoreDecayConfig decay = new UserTopicScoreDecayConfig();
