@@ -21,7 +21,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 @Slf4j
 public class LLMService {
-    private static final int maxTopics = 100;
+    private static final int maxTopics = 20;
     private final ChatModel chatModel;
 
     private static String getTopicFromResponse(ChatResponse response) {
