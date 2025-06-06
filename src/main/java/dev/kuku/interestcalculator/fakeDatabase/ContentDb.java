@@ -4,12 +4,17 @@ import jakarta.annotation.PostConstruct;
 import org.springframework.stereotype.Repository;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
 @Repository
 public class ContentDb {
     private final Map<String, ContentRow> contentTopicRows = new HashMap<>();
+
+    public List<ContentRow> getAllContents() {
+        return List.copyOf(contentTopicRows.values());
+    }
 
     // Method to insert one ContentRow into the map
     private void add(String contentId, String content, Set<String> topics, String userId, long timestamp) {

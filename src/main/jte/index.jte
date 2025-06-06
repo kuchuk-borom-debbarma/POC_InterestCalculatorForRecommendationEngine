@@ -1,94 +1,54 @@
-<%@ page contentType="text/html;charset=UTF-8" language="java" %>
-<%@ import="java.util.*" %>
-
+<!DOCTYPE html>
 <html lang="en">
 <head>
-    <title>User Topic Scoring Algorithm</title>
+    <meta charset="UTF-8">
+    <title>User Topic Scoring Algorithm Test</title>
     <style>
         body {
             font-family: Arial, sans-serif;
-            margin: 20px;
+            padding: 2rem;
+            background-color: #f5f5f5;
         }
-
-        .container {
-            max-width: 1000px;
-            margin: 0 auto;
+        h1 {
+            text-align: center;
         }
-
-        .menu {
+        .option-container {
             display: flex;
-            flex-wrap: wrap;
-            gap: 10px;
-            margin-bottom: 20px;
+            justify-content: center;
+            gap: 2rem;
+            margin-top: 3rem;
         }
-
-        .menu-option {
-            padding: 10px 15px;
-            background: #4CAF50;
-            color: white;
+        .option-card {
+            padding: 1.5rem 2rem;
+            background-color: #ffffff;
+            border-radius: 8px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+            text-align: center;
+            cursor: pointer;
+            transition: transform 0.2s;
+            width: 250px;
+        }
+        .option-card:hover {
+            transform: scale(1.05);
+        }
+        .option-card a {
             text-decoration: none;
-            border-radius: 4px;
-            cursor: pointer;
-            border: none;
-        }
-
-        .menu-option:hover {
-            background: #45a049;
-        }
-
-        .analytics-button {
-            padding: 10px 15px;
-            background: #2196F3;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            margin-top: 20px;
-        }
-
-        .analytics-button:hover {
-            background: #0b7dda;
-        }
-
-        .hidden {
-            display: none;
+            color: #333;
+            font-weight: bold;
+            display: block;
         }
     </style>
 </head>
 <body>
-<div class="container">
-    <h1>User Topic Scoring Algorithm</h1>
+<h1>User Topic Scoring Algorithm Test</h1>
 
-    <div class="menu">
-        <button class="menu-option">1. Add content manually</button>
-        <button class="menu-option">2. Add content using AI</button>
-        <button class="menu-option">3. Simulate User interaction manually</button>
-        <button class="menu-option">4. Simulate User interaction using AI</button>
+<div class="option-container">
+    <div class="option-card">
+        <a href="/interact">1. Interact with Content</a>
     </div>
-
-    <button id="showAnalytics" class="analytics-button">View Analytics</button>
-
-    <div id="analyticsSection" class="hidden">
-        <h2>Topic Analytics Preview</h2>
-
-
+    <div class="option-card">
+        <a href="/view-score">2. View User Topic Score</a>
     </div>
 </div>
-
-<script>
-    document.getElementById('showAnalytics').addEventListener('click', function () {
-        // In a real application, this would navigate to a new page
-        // window.location.href = '/analytics';
-
-        // For now, just show/hide the preview section
-        const analyticsSection = document.getElementById('analyticsSection');
-        analyticsSection.classList.toggle('hidden');
-
-        // Change button text based on state
-        this.textContent = analyticsSection.classList.contains('hidden')
-            ? 'View Analytics'
-            : 'Hide Analytics Preview';
-    });
-</script>
 </body>
 </html>
