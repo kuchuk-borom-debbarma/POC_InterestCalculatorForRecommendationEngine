@@ -1,5 +1,6 @@
 package dev.kuku.interestcalculator.fakeDatabase;
 
+import lombok.AllArgsConstructor;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
 
@@ -50,7 +51,7 @@ public class UserInteractionsDb {
     public enum InteractionType {
         LIKE, COMMENT, REPORT
     }
-
+    @AllArgsConstructor
     public static class UserInteractionRow {
         public String userId;
         public String contentId;

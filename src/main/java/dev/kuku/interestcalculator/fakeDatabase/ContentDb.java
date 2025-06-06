@@ -161,6 +161,10 @@ public class ContentDb {
         return contentTopicRows.get(contentId);
     }
 
+    public void setTopicsOfContent(Set<String> topics, String contentId) {
+        contentTopicRows.put(contentId, new ContentRow(contentId, contentTopicRows.get(contentId).content, topics, contentTopicRows.get(contentId).userId, contentTopicRows.get(contentId).timestamp));
+    }
+
     public static record ContentRow(String contentId, String content, Set<String> topics, String userId,
                                     long timestamp) {
     }

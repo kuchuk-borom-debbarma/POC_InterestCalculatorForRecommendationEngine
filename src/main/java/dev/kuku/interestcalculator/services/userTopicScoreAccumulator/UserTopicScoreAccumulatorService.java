@@ -4,6 +4,7 @@ import dev.kuku.interestcalculator.fakeDatabase.ContentDb;
 import dev.kuku.interestcalculator.fakeDatabase.TopicDb;
 import dev.kuku.interestcalculator.fakeDatabase.UserInteractionsDb;
 import dev.kuku.interestcalculator.services.LLMService;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -14,13 +15,17 @@ import java.util.Map;
 import java.util.Set;
 
 @Service
+@RequiredArgsConstructor
 public class UserTopicScoreAccumulatorService {
     // Momentum calculation parameters
     private static final double MOMENTUM_SCALING_FACTOR = 0.2;
     private static final double FREQUENCY_DECAY_RATE = 0.15; // per day
+    private static final double FREQUENCY_SCALE_FACTOR = 1.5; // Controls frequency weight sensitivity
     private static final int MOMENTUM_WINDOW_DAYS = 7;
     private static final double MAX_MOMENTUM_MULTIPLIER = 1.5;
+    private static final double MAX_CONSECUTIVE_MULTIPLIER = 1.3; // Separate cap for consecutive bonus
     private static final int MIN_CONSECUTIVE_FOR_MOMENTUM = 2;
+    private static final int MAX_CONSECUTIVE_CAP = 10; // Prevent extreme consecutive counts
 
     // Score saturation parameters
     private static final double MAX_SCORE_DELTA = 10.0;
@@ -34,16 +39,6 @@ public class UserTopicScoreAccumulatorService {
     private final TopicSetBaseScorer topicSetBaseScorer;
     private final UserInteractionsDb userInteractionsDb;
 
-    public UserTopicScoreAccumulatorService(ContentDb contentDb, TopicDb topicDb,
-                                            LLMService llmService, TopicSetBaseScorer topicSetBaseScorer,
-                                            UserInteractionsDb userInteractionsDb) {
-        this.contentDb = contentDb;
-        this.topicDb = topicDb;
-        this.llmService = llmService;
-        this.topicSetBaseScorer = topicSetBaseScorer;
-        this.userInteractionsDb = userInteractionsDb;
-    }
-
     public Map<String, Double> accumulate(String userId, UserInteractionsDb.UserInteractionRow interaction) {
         double rawBaseScore = topicSetBaseScorer.calculateRawScore(
                 interaction.contentDiscovery, interaction.interactionType);
@@ -52,6 +47,8 @@ public class UserTopicScoreAccumulatorService {
         Set<String> topics = content.topics();
         if (topics == null || topics.isEmpty()) {
             topics = llmService.getTopics(topicDb.topics, content.content());
+            topicDb.topics.addAll(topics);
+            contentDb.setTopicsOfContent(topics, interaction.contentId);
         }
 
         Map<String, Double> topicToScoreDelta = new HashMap<>();
@@ -62,11 +59,7 @@ public class UserTopicScoreAccumulatorService {
             double momentum = calculateMomentum(userId, topic, isPositive);
             double amplifiedScore = baseScoreMagnitude * momentum;
             double finalScore = applySaturation(amplifiedScore);
-
-            // Apply direction and ensure score is within bounds
-            double scoreDelta = Math.min(MAX_SCORE_DELTA,
-                    Math.max(-MAX_SCORE_DELTA,
-                            isPositive ? finalScore : -finalScore));
+            double scoreDelta = isPositive ? finalScore : -finalScore;
             topicToScoreDelta.put(topic, scoreDelta);
         }
 
@@ -80,20 +73,38 @@ public class UserTopicScoreAccumulatorService {
         List<UserInteractionsDb.UserInteractionRow> recentHistory =
                 userInteractionsDb.getInteractionsOfUserFromTo(userId, topic, fromTime, currentTime);
 
+        // Handle edge case: no history
+        if (recentHistory.isEmpty()) {
+            return 1.0;
+        }
+
         int consecutive = countConsecutiveSameType(recentHistory, isCurrentPositive);
-        double frequencyWeight = calculateFrequencyWeight(recentHistory, currentTime, isCurrentPositive);
+        double frequencyMultiplier = calculateFrequencyMultiplier(recentHistory, currentTime, isCurrentPositive);
+        double consecutiveMultiplier = calculateConsecutiveMultiplier(consecutive);
 
-        // Only apply momentum after minimum consecutive threshold
-        double baseMultiplier = consecutive >= MIN_CONSECUTIVE_FOR_MOMENTUM ?
-                1.0 + Math.log(1 + consecutive) * MOMENTUM_SCALING_FACTOR : 1.0;
-
-        // Normalized momentum calculation
-        double momentum = baseMultiplier * frequencyWeight;
+        // Multiplicative momentum calculation with proper bounds
+        double momentum = consecutiveMultiplier * frequencyMultiplier;
         return Math.min(momentum, MAX_MOMENTUM_MULTIPLIER);
     }
 
-    private double calculateFrequencyWeight(List<UserInteractionsDb.UserInteractionRow> recentHistory,
-                                            long currentTime, boolean targetType) {
+    private double calculateConsecutiveMultiplier(int consecutive) {
+        // Only apply momentum after minimum consecutive threshold
+        if (consecutive < MIN_CONSECUTIVE_FOR_MOMENTUM) {
+            return 1.0;
+        }
+
+        // Cap consecutive count to prevent extreme values
+        int cappedConsecutive = Math.min(consecutive, MAX_CONSECUTIVE_CAP);
+
+        // Bounded logarithmic scaling with separate maximum
+        double consecutiveBoost = Math.log(1 + cappedConsecutive) * MOMENTUM_SCALING_FACTOR;
+        double multiplier = 1.0 + consecutiveBoost;
+
+        return Math.min(multiplier, MAX_CONSECUTIVE_MULTIPLIER);
+    }
+
+    private double calculateFrequencyMultiplier(List<UserInteractionsDb.UserInteractionRow> recentHistory,
+                                                long currentTime, boolean targetType) {
         if (recentHistory.isEmpty()) return 1.0;
 
         double totalWeight = 0.0;
@@ -113,12 +124,20 @@ public class UserTopicScoreAccumulatorService {
         if (relevantCount == 0) return 1.0;
 
         double avgWeight = totalWeight / relevantCount;
-        // Normalized to smoothly approach MAX_MOMENTUM_MULTIPLIER
-        return 1.0 + (avgWeight / (1 + avgWeight)) * (MAX_MOMENTUM_MULTIPLIER - 1.0);
+
+        // Use hyperbolic tangent for principled bounded scaling
+        // tanh provides smooth S-curve from 0 to 1, then scaled to [1, MAX_FREQUENCY_MULTIPLIER]
+        double maxFrequencyMultiplier = MAX_MOMENTUM_MULTIPLIER / MAX_CONSECUTIVE_MULTIPLIER; // Balanced allocation
+        double normalizedWeight = Math.tanh(avgWeight * FREQUENCY_SCALE_FACTOR);
+
+        return 1.0 + normalizedWeight * (maxFrequencyMultiplier - 1.0);
     }
 
     private int countConsecutiveSameType(List<UserInteractionsDb.UserInteractionRow> recentHistory,
                                          boolean targetType) {
+        if (recentHistory.isEmpty()) return 0;
+
+        // Sort by interaction time (most recent first)
         recentHistory.sort((a, b) -> Long.compare(b.interactionTime, a.interactionTime));
 
         int count = 0;
@@ -136,7 +155,10 @@ public class UserTopicScoreAccumulatorService {
     }
 
     private double applySaturation(double score) {
-        // Sigmoid saturation adjusted to MAX_SCORE_DELTA range
-        return MAX_SCORE_DELTA / (1 + Math.exp(-SATURATION_STEEPNESS * (score - SATURATION_INFLECTION)));
+        // Handle edge case: negative or zero scores
+        if (score <= 0) return 0.0;
+
+        double sigmoid = 1.0 / (1 + Math.exp(-SATURATION_STEEPNESS * (score - SATURATION_INFLECTION)));
+        return sigmoid * MAX_SCORE_DELTA;
     }
 }
