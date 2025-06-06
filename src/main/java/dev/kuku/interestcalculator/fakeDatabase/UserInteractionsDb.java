@@ -49,8 +49,9 @@ public class UserInteractionsDb {
     }
 
     public enum InteractionType {
-        LIKE, COMMENT, REPORT
+        LIKE, DISLIKE, COMMENT, REPORT
     }
+
     @AllArgsConstructor
     public static class UserInteractionRow {
         public String userId;
