@@ -35,7 +35,7 @@ public class UserInteractionsDb {
 
     // Helper method to create a copy of UserInteractionRow
     private UserInteractionRow copyInteraction(UserInteractionRow original) {
-        UserInteractionRow copy = new UserInteractionRow();
+        UserInteractionRow copy = new UserInteractionRow(original.userId, original.contentId, original.contentDiscovery, original.interactionType, original.interactionTime);
         copy.userId = original.userId;
         copy.contentId = original.contentId;
         copy.contentDiscovery = original.contentDiscovery;
