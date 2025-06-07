@@ -2,14 +2,19 @@ package dev.kuku.interestcalculator.controller;
 
 import dev.kuku.interestcalculator.fakeDatabase.UserInteractionsDb;
 import dev.kuku.interestcalculator.services.userTopicScoreAccumulator.UserTopicScoreAccumulatorService;
+import dev.kuku.interestcalculator.util.TestTimeProvider;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.annotation.Profile;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequiredArgsConstructor
+@Profile("test")
 public class UserTopicScoringController {
     private final UserTopicScoreAccumulatorService userTopicScoreAccumulatorService;
+    private final TestTimeProvider testTimeProvider;
+    private final UserInteractionsDb userInteractionsDb;
 
     @PostMapping("/content/{contentId}/{interactionType}")
     public ResponseEntity<String> interact(
@@ -21,19 +26,45 @@ public class UserTopicScoringController {
         try {
             UserInteractionsDb.InteractionType interaction = UserInteractionsDb.InteractionType.valueOf(interactionType.toUpperCase());
             UserInteractionsDb.Discovery discovery = UserInteractionsDb.Discovery.valueOf(discoveryMethod.toUpperCase());
-            long currentTime = System.currentTimeMillis();
-
+            var currentTime = testTimeProvider.nowMillis();
             UserInteractionsDb.UserInteractionRow interactionRow = new UserInteractionsDb.UserInteractionRow(
                     userId, contentId, discovery, interaction, currentTime
             );
 
             userTopicScoreAccumulatorService.accumulate(userId, interactionRow);
+            userInteractionsDb.addInteraction(userId, contentId, discovery, interaction, currentTime);
 
             return ResponseEntity.ok("Interaction recorded successfully");
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body("Invalid interaction type or discovery method");
         } catch (Exception e) {
             return ResponseEntity.internalServerError().body("Error processing interaction");
+        }
+    }
+
+    @PostMapping("/api/advance-time")
+    public ResponseEntity<String> advanceTime(
+            @RequestParam(value = "days", defaultValue = "0") int days,
+            @RequestParam(value = "hours", defaultValue = "0") int hours,
+            @RequestParam(value = "minutes", defaultValue = "0") int minutes) {
+
+        try {
+            testTimeProvider.advanceDays(days);
+            testTimeProvider.advanceHours(hours);
+            testTimeProvider.advanceMinutes(minutes);
+            return ResponseEntity.ok("Time advanced successfully");
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body("Error advancing time");
+        }
+    }
+
+    @GetMapping("/api/current-time")
+    public ResponseEntity<String> getCurrentTime() {
+        try {
+            var currentTime = testTimeProvider.now();
+            return ResponseEntity.ok(currentTime.toString());
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body("Error getting current time");
         }
     }
 }

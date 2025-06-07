@@ -33,6 +33,11 @@ public class UserInteractionsDb {
                 .toList();
     }
 
+    //create a function to add interaction to the database
+    public void addInteraction(String userId, String contentId, Discovery contentDiscovery, InteractionType interactionType, long interactionTime) {
+        userInteractionRows.add(new UserInteractionRow(userId, contentId, contentDiscovery, interactionType, interactionTime));
+    }
+
     // Helper method to create a copy of UserInteractionRow
     private UserInteractionRow copyInteraction(UserInteractionRow original) {
         UserInteractionRow copy = new UserInteractionRow(original.userId, original.contentId, original.contentDiscovery, original.interactionType, original.interactionTime);

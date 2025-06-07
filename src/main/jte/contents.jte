@@ -27,7 +27,7 @@
         }
 
         .sidebar {
-            width: 300px;
+            width: 320px;
             background: white;
             box-shadow: 2px 0 10px rgba(0,0,0,0.1);
             padding: 20px;
@@ -57,7 +57,7 @@
             font-size: 0.9em;
         }
 
-        .control-group select {
+        .control-group select, .control-group input {
             width: 100%;
             padding: 10px;
             border: 2px solid #e1e5e9;
@@ -67,9 +67,108 @@
             transition: border-color 0.2s ease;
         }
 
-        .control-group select:focus {
+        .control-group select:focus, .control-group input:focus {
             outline: none;
             border-color: #667eea;
+        }
+
+        .time-controls {
+            background: #f8f9fb;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border: 1px solid #e1e5e9;
+        }
+
+        .time-controls h4 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 1em;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .time-input-group {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .time-input-item {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .time-input-item label {
+            font-size: 0.75em;
+            color: #666;
+            margin-bottom: 4px;
+            font-weight: 500;
+        }
+
+        .time-input-item input {
+            padding: 8px;
+            font-size: 0.8em;
+            text-align: center;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        .current-time-display {
+            background: white;
+            padding: 10px;
+            border-radius: 6px;
+            border: 1px solid #ddd;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85em;
+            color: #333;
+            text-align: center;
+            margin-bottom: 10px;
+        }
+
+        .time-button-group {
+            display: flex;
+            gap: 8px;
+        }
+
+        .time-btn {
+            flex: 1;
+            padding: 8px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.8em;
+            transition: all 0.2s ease;
+            font-weight: 500;
+        }
+
+        .refresh-time-btn {
+            background: #667eea;
+            color: white;
+        }
+
+        .refresh-time-btn:hover {
+            background: #5a6fd8;
+            transform: translateY(-1px);
+        }
+
+        .advance-time-btn {
+            background: #28a745;
+            color: white;
+        }
+
+        .advance-time-btn:hover {
+            background: #218838;
+            transform: translateY(-1px);
+        }
+
+        .advance-time-btn:disabled,
+        .refresh-time-btn:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+            transform: none;
         }
 
         .user-id-input {
@@ -116,7 +215,7 @@
         }
 
         .main-content {
-            margin-left: 320px;
+            margin-left: 340px;
             flex: 1;
             padding: 20px;
         }
@@ -313,11 +412,11 @@
 
         @media (max-width: 1024px) {
             .sidebar {
-                width: 250px;
+                width: 280px;
             }
 
             .main-content {
-                margin-left: 270px;
+                margin-left: 300px;
             }
         }
 
@@ -377,6 +476,38 @@
         </select>
     </div>
 
+    <div class="time-controls">
+        <h4><i class="fas fa-clock"></i> Time Controls</h4>
+
+        <div class="time-input-group">
+            <div class="time-input-item">
+                <label>Minutes</label>
+                <input type="number" id="advanceMinutes" value="0" min="0" max="59">
+            </div>
+            <div class="time-input-item">
+                <label>Hours</label>
+                <input type="number" id="advanceHours" value="0" min="0" max="23">
+            </div>
+            <div class="time-input-item">
+                <label>Days</label>
+                <input type="number" id="advanceDays" value="0" min="0" max="30">
+            </div>
+        </div>
+
+        <div class="current-time-display" id="currentTimeDisplay">
+            Loading current time...
+        </div>
+
+        <div class="time-button-group">
+            <button class="time-btn refresh-time-btn" onclick="refreshCurrentTime()">
+                <i class="fas fa-sync-alt"></i> Refresh
+            </button>
+            <button class="time-btn advance-time-btn" onclick="advanceTime()">
+                <i class="fas fa-fast-forward"></i> Advance
+            </button>
+        </div>
+    </div>
+
     <div class="current-settings">
         <h4><i class="fas fa-info-circle"></i> Current Settings</h4>
         <div class="setting-item">
@@ -386,10 +517,6 @@
         <div class="setting-item">
             <span class="setting-label">Discovery:</span>
             <span class="setting-value" id="currentDiscovery">TRENDING</span>
-        </div>
-        <div class="setting-item">
-            <span class="setting-label">Time:</span>
-            <span class="setting-value" id="currentTime">Real-time</span>
         </div>
     </div>
 </div>
@@ -478,6 +605,88 @@
         document.getElementById('currentDiscovery').textContent = discovery;
     }
 
+    // Refresh current time from server
+    async function refreshCurrentTime() {
+        const button = document.querySelector('.refresh-time-btn');
+        const originalContent = button.innerHTML;
+
+        button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Loading...';
+        button.disabled = true;
+
+        try {
+            const response = await fetch('/api/current-time');
+            if (response.ok) {
+                const timeData = await response.text();
+                document.getElementById('currentTimeDisplay').textContent = timeData;
+                showSuccessMessage('Time refreshed successfully');
+            } else {
+                document.getElementById('currentTimeDisplay').textContent = 'Error loading time';
+                showErrorMessage('Failed to refresh time');
+            }
+        } catch (error) {
+            document.getElementById('currentTimeDisplay').textContent = 'Error loading time';
+            showErrorMessage('Network error while refreshing time');
+            console.error('Error fetching time:', error);
+        } finally {
+            button.innerHTML = originalContent;
+            button.disabled = false;
+        }
+    }
+
+    // Advance time function
+    async function advanceTime() {
+        const minutes = document.getElementById('advanceMinutes').value || '0';
+        const hours = document.getElementById('advanceHours').value || '0';
+        const days = document.getElementById('advanceDays').value || '0';
+
+        // Check if any time values are set
+        if (minutes === '0' && hours === '0' && days === '0') {
+            showErrorMessage('Please set at least one time value to advance');
+            return;
+        }
+
+        const button = document.querySelector('.advance-time-btn');
+        const originalContent = button.innerHTML;
+
+        button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Advancing...';
+        button.disabled = true;
+
+        try {
+            const url = '/api/advance-time?' +
+                'minutes=' + encodeURIComponent(minutes) +
+                '&hours=' + encodeURIComponent(hours) +
+                '&days=' + encodeURIComponent(days);
+
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                }
+            });
+
+            const responseText = await response.text();
+
+            if (response.ok) {
+                showSuccessMessage('Time advanced successfully!');
+                // Automatically refresh the current time after advancing
+                await refreshCurrentTime();
+
+                // Reset the time input fields
+                document.getElementById('advanceMinutes').value = '0';
+                document.getElementById('advanceHours').value = '0';
+                document.getElementById('advanceDays').value = '0';
+            } else {
+                showErrorMessage('Error advancing time: ' + responseText);
+            }
+        } catch (error) {
+            showErrorMessage('Network error while advancing time');
+            console.error('Time advance error:', error);
+        } finally {
+            button.innerHTML = originalContent;
+            button.disabled = false;
+        }
+    }
+
     // Initialize and add event listeners
     document.getElementById('userId').addEventListener('input', updateCurrentSettings);
     document.getElementById('discoveryMethod').addEventListener('change', updateCurrentSettings);
@@ -527,7 +736,10 @@
         button.disabled = true;
 
         try {
-            const url = '/content/' + contentId + '/' + interactionType + '?discoveryMethod=' + discoveryMethod + '&userId=' + encodeURIComponent(userId);
+            const url = '/content/' + contentId + '/' + interactionType +
+                '?discoveryMethod=' + discoveryMethod +
+                '&userId=' + encodeURIComponent(userId);
+
             const response = await fetch(url, {
                 method: 'POST',
                 headers: {
@@ -560,8 +772,9 @@
         }
     }
 
-    // Initialize current settings display
+    // Initialize current settings display and load current time
     updateCurrentSettings();
+    refreshCurrentTime();
 
     // Add click feedback animation
     document.querySelectorAll('.action-btn').forEach(btn => {

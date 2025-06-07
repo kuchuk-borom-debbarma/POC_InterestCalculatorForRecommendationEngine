@@ -5,10 +5,10 @@ import dev.kuku.interestcalculator.fakeDatabase.TopicDb;
 import dev.kuku.interestcalculator.fakeDatabase.UserInteractionsDb;
 import dev.kuku.interestcalculator.fakeDatabase.UserTopicScoreDb;
 import dev.kuku.interestcalculator.services.LLMService;
+import dev.kuku.interestcalculator.util.TimeProvider;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
-import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.HashMap;
 import java.util.List;
@@ -40,15 +40,17 @@ public class UserTopicScoreAccumulatorService {
     private final TopicSetBaseScorer baseScorer;
     private final UserInteractionsDb userInteractionsDb;
     private final UserTopicScoreDb userTopicScoreDb;
+    private final TimeProvider timeProvider;
 
     public void accumulate(String userId, UserInteractionsDb.UserInteractionRow interaction) {
+        //1. Calculate raw base score for ALL topics
         double rawScore = baseScorer.calculateRawScore(interaction.contentDiscovery, interaction.interactionType);
         boolean isPositive = rawScore > 0;
         double scoreMagnitude = Math.abs(rawScore);
-
+        //2. Get topics for this content
         ContentDb.ContentRow content = contentDb.getContentById(interaction.contentId);
         Set<String> topics = getContentTopics(content, interaction.contentId);
-
+        //3. Calculate momentum for each topic
         Map<String, Double> deltaScores = topics.stream().collect(Collectors.toMap(
                 topic -> topic,
                 topic -> {
@@ -57,22 +59,14 @@ public class UserTopicScoreAccumulatorService {
                     return isPositive ? amplifiedScore : -amplifiedScore;
                 }
         ));
-
-        // Get current scores and calculate new scores with saturation
+        //4. Add delta to existing score with saturation
         Map<String, Double> newScores = new HashMap<>();
         for (Map.Entry<String, Double> entry : deltaScores.entrySet()) {
             String topic = entry.getKey();
             double deltaScore = entry.getValue();
-
-            // Get current accumulated score for this user-topic pair
             double currentScore = userTopicScoreDb.getCurrentScore(userId, topic);
-
-            // Calculate new total score
             double newTotalScore = currentScore + deltaScore;
-
-            // Apply saturation to the total accumulated score
             double saturatedScore = applySaturation(newTotalScore);
-
             newScores.put(topic, saturatedScore);
         }
 
@@ -90,8 +84,8 @@ public class UserTopicScoreAccumulatorService {
     }
 
     private double calculateMomentum(String userId, String topic, boolean isPositive) {
-        long now = Instant.now().toEpochMilli();
-        long from = Instant.now().minus(MOMENTUM_WINDOW, ChronoUnit.DAYS).toEpochMilli();
+        long now = timeProvider.nowMillis();
+        long from = timeProvider.now().minus(MOMENTUM_WINDOW, ChronoUnit.DAYS).toEpochMilli();
 
         List<UserInteractionsDb.UserInteractionRow> history =
                 userInteractionsDb.getInteractionsOfUserFromTo(userId, topic, from, now);
@@ -149,7 +143,6 @@ public class UserTopicScoreAccumulatorService {
     private double applySaturation(double totalScore) {
         // Handle negative scores by clamping to minimum
         if (totalScore <= MIN_SCORE) return MIN_SCORE;
-
         // Apply sigmoid saturation to approach MAX_SCORE asymptotically
         double sigmoid = 1.0 / (1 + Math.exp(-SATURATION_STEEPNESS * (totalScore - SATURATION_INFLECTION)));
         return sigmoid * MAX_SCORE;
