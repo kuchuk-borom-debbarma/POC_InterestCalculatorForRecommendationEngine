@@ -6,17 +6,17 @@ import org.springframework.stereotype.Component;
 @Component
 public class TopicSetBaseScorer {
     // Content discovery multipliers (intent strength: 1.0 - 5.0)
-    private static final double SEARCH_MULTIPLIER = 5.0;        // Highest intent
-    private static final double TRENDING_MULTIPLIER = 2.5;      // Medium intent
+    private static final double SEARCH_MULTIPLIER = 3.0;        // Highest intent
+    private static final double TRENDING_MULTIPLIER = 2.0;      // Medium intent
     private static final double RECOMMENDATION_MULTIPLIER = 1.0; // Lowest intent
 
     // Interaction multipliers
     // Positive interactions
-    private static final double COMMENT_MULTIPLIER = 2.0;   // Strong positive engagement
+    private static final double COMMENT_MULTIPLIER = 1.5;   // Strong positive engagement
     private static final double LIKE_MULTIPLIER = 1.0;     // Minor positive engagement
 
     // Negative interactions
-    private static final double REPORT_MULTIPLIER = -2.0;   // Strong negative feedback
+    private static final double REPORT_MULTIPLIER = -1.5;   // Strong negative feedback
     private static final double DISLIKE_MULTIPLIER = -1.0; // Minor negative feedback
 
     // Score bounds

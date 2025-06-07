@@ -1,15 +1,12 @@
 package dev.kuku.interestcalculator.dto;
 
-import org.springframework.context.annotation.Scope;
-import org.springframework.context.annotation.ScopedProxyMode;
 import org.springframework.stereotype.Component;
-import org.springframework.web.context.WebApplicationContext;
 
 import java.util.HashMap;
 import java.util.Map;
 
 @Component
-@Scope(value = WebApplicationContext.SCOPE_REQUEST, proxyMode = ScopedProxyMode.TARGET_CLASS)
+//Its ok to let this be singleton, as it's value gets replaced any ways for now
 public class OperationDetailMap {
     public Map<String, Object> operationDetailMap = new HashMap<>();
 }

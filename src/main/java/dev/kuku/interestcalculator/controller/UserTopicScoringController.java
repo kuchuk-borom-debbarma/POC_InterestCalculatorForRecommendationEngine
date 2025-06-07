@@ -53,6 +53,7 @@ public class UserTopicScoringController {
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().build();
         } catch (Exception e) {
+            log.error("Error while processing interaction", e);
             return ResponseEntity.internalServerError().build();
         }
     }
