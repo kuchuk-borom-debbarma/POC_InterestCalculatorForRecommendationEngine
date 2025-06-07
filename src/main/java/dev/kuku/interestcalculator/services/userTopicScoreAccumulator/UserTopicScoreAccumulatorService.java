@@ -1,5 +1,6 @@
 package dev.kuku.interestcalculator.services.userTopicScoreAccumulator;
 
+import dev.kuku.interestcalculator.dto.OperationDetailMap;
 import dev.kuku.interestcalculator.fakeDatabase.ContentDb;
 import dev.kuku.interestcalculator.fakeDatabase.TopicDb;
 import dev.kuku.interestcalculator.fakeDatabase.UserInteractionsDb;
@@ -10,10 +11,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.time.temporal.ChronoUnit;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -41,36 +39,83 @@ public class UserTopicScoreAccumulatorService {
     private final UserInteractionsDb userInteractionsDb;
     private final UserTopicScoreDb userTopicScoreDb;
     private final TimeProvider timeProvider;
+    private final OperationDetailMap operationDetailMap;
 
     public void accumulate(String userId, UserInteractionsDb.UserInteractionRow interaction) {
-        //1. Calculate raw base score for ALL topics
+        Map<String, Object> operationLog = operationDetailMap.operationDetailMap;
+
+        // 1. Calculate raw base score
         double rawScore = baseScorer.calculateRawScore(interaction.contentDiscovery, interaction.interactionType);
         boolean isPositive = rawScore > 0;
         double scoreMagnitude = Math.abs(rawScore);
-        //2. Get topics for this content
+
+        operationLog.put("userId", userId);
+        operationLog.put("contentId", interaction.contentId);
+        operationLog.put("interactionType", interaction.interactionType);
+        operationLog.put("discoveryMethod", interaction.contentDiscovery);
+        operationLog.put("rawBaseScore", rawScore);
+
+        // 2. Get topics for this content
         ContentDb.ContentRow content = contentDb.getContentById(interaction.contentId);
         Set<String> topics = getContentTopics(content, interaction.contentId);
-        //3. Calculate momentum for each topic
-        Map<String, Double> deltaScores = topics.stream().collect(Collectors.toMap(
-                topic -> topic,
-                topic -> {
-                    double momentum = calculateMomentum(userId, topic, isPositive);
-                    double amplifiedScore = scoreMagnitude * momentum;
-                    return isPositive ? amplifiedScore : -amplifiedScore;
-                }
-        ));
-        //4. Add delta to existing score with saturation
-        Map<String, Double> newScores = new HashMap<>();
+        operationLog.put("contentTopics", topics);
+
+        // 3. Calculate momentum for each topic
+        Map<String, Map<String, Object>> topicCalculations = new LinkedHashMap<>();
+        Map<String, Double> deltaScores = new LinkedHashMap<>();
+
+        for (String topic : topics) {
+            Map<String, Object> topicLog = new LinkedHashMap<>();
+
+            // Calculate momentum components
+            long now = timeProvider.nowMillis();
+            long from = timeProvider.now().minus(MOMENTUM_WINDOW, ChronoUnit.DAYS).toEpochMilli();
+            List<UserInteractionsDb.UserInteractionRow> history =
+                    userInteractionsDb.getInteractionsOfUserFromTo(userId, topic, from, now);
+
+            int consecutive = countConsecutive(history, isPositive);
+            double freqMultiplier = calculateFrequencyMultiplier(history, now, isPositive);
+            double consecMultiplier = calculateConsecutiveMultiplier(consecutive);
+            double momentum = Math.min(consecMultiplier * freqMultiplier, MAX_MOMENTUM);
+
+            topicLog.put("historySize", history.size());
+            topicLog.put("consecutiveActions", consecutive);
+            topicLog.put("frequencyMultiplier", freqMultiplier);
+            topicLog.put("consecutiveMultiplier", consecMultiplier);
+            topicLog.put("momentum", momentum);
+
+            double amplifiedScore = scoreMagnitude * momentum;
+            double deltaScore = isPositive ? amplifiedScore : -amplifiedScore;
+
+            topicLog.put("amplifiedScore", amplifiedScore);
+            topicLog.put("deltaScore", deltaScore);
+
+            topicCalculations.put(topic, topicLog);
+            deltaScores.put(topic, deltaScore);
+        }
+
+        operationLog.put("topicCalculations", topicCalculations);
+
+        // 4. Apply delta with saturation
+        Map<String, Map<String, Double>> scoreUpdates = new LinkedHashMap<>();
         for (Map.Entry<String, Double> entry : deltaScores.entrySet()) {
             String topic = entry.getKey();
             double deltaScore = entry.getValue();
             double currentScore = userTopicScoreDb.getCurrentScore(userId, topic);
             double newTotalScore = currentScore + deltaScore;
             double saturatedScore = applySaturation(newTotalScore);
-            newScores.put(topic, saturatedScore);
+
+            Map<String, Double> scoreUpdate = new LinkedHashMap<>();
+            scoreUpdate.put("currentScore", currentScore);
+            scoreUpdate.put("delta", deltaScore);
+            scoreUpdate.put("newRawScore", newTotalScore);
+            scoreUpdate.put("newSaturatedScore", saturatedScore);
+
+            scoreUpdates.put(topic, scoreUpdate);
         }
 
-        userTopicScoreDb.updateTopicScores(userId, newScores);
+        operationLog.put("scoreUpdates", scoreUpdates);
+        userTopicScoreDb.updateTopicScores(userId, deltaScores);
     }
 
     private Set<String> getContentTopics(ContentDb.ContentRow content, String contentId) {

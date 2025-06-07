@@ -1,5 +1,6 @@
 package dev.kuku.interestcalculator.controller;
 
+import dev.kuku.interestcalculator.dto.OperationDetailMap;
 import dev.kuku.interestcalculator.fakeDatabase.ContentDb;
 import dev.kuku.interestcalculator.fakeDatabase.UserInteractionsDb;
 import dev.kuku.interestcalculator.services.userTopicScoreAccumulator.UserTopicScoreAccumulatorService;
@@ -11,6 +12,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequiredArgsConstructor
@@ -22,6 +24,7 @@ public class UserTopicScoringController {
     private final TestTimeProvider testTimeProvider;
     private final UserInteractionsDb userInteractionsDb;
     private final ContentDb contentDb;
+    private final OperationDetailMap operationDetailMap;
 
     @GetMapping("/content")
     public ResponseEntity<List<ContentDb.ContentRow>> getAllContents() {
@@ -30,7 +33,7 @@ public class UserTopicScoringController {
     }
 
     @PostMapping("/content/{contentId}/{interactionType}")
-    public ResponseEntity<String> interact(
+    public ResponseEntity<Map<String, Object>> interact(
             @PathVariable("contentId") String contentId,
             @PathVariable("interactionType") String interactionType,
             @RequestParam(value = "discoveryMethod", defaultValue = "TRENDING") String discoveryMethod,
@@ -46,12 +49,11 @@ public class UserTopicScoringController {
 
             userTopicScoreAccumulatorService.accumulate(userId, interactionRow);
             userInteractionsDb.addInteraction(userId, contentId, discovery, interaction, currentTime);
-
-            return ResponseEntity.ok("Interaction recorded successfully");
+            return ResponseEntity.ok(operationDetailMap.operationDetailMap);
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body("Invalid interaction type or discovery method");
+            return ResponseEntity.badRequest().build();
         } catch (Exception e) {
-            return ResponseEntity.internalServerError().body("Error processing interaction");
+            return ResponseEntity.internalServerError().build();
         }
     }
 

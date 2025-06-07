@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Content Viewer</title>
+    <title>Content Viewer with Detailed Stats</title>
     <style>
         body { font-family: Arial; margin: 0; display: flex; }
         .sidebar { width: 200px; background: #f5f5f5; padding: 15px; }
@@ -12,6 +12,56 @@
         button { margin: 2px; padding: 3px 6px; }
         .section { margin-bottom: 15px; }
         #currentTime { background: #f0f0f0; padding: 5px; }
+        .stats-panel {
+            position: fixed;
+            top: 0;
+            right: 0;
+            width: 400px;
+            height: 100vh;
+            background: white;
+            box-shadow: -2px 0 5px rgba(0,0,0,0.1);
+            padding: 15px;
+            overflow-y: auto;
+            display: none;
+        }
+        .stats-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .stats-section {
+            margin-bottom: 15px;
+            padding: 10px;
+            background: #f9f9f9;
+            border-radius: 5px;
+        }
+        .stats-section h3 {
+            margin-top: 0;
+            color: #444;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 5px;
+        }
+        .stats-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 5px;
+        }
+        .stats-key { font-weight: bold; color: #555; }
+        .stats-value { color: #333; }
+        .topic-stats {
+            margin-top: 10px;
+            padding: 8px;
+            background: #fff;
+            border: 1px solid #eee;
+            border-radius: 4px;
+        }
+        .close-btn {
+            background: #eee;
+            border: none;
+            padding: 3px 8px;
+            cursor: pointer;
+        }
     </style>
 </head>
 <body>
@@ -38,8 +88,17 @@
     <div id="contents"></div>
 </div>
 
+<div class="stats-panel" id="statsPanel">
+    <div class="stats-header">
+        <h2>Interaction Details</h2>
+        <button class="close-btn" onclick="closeStatsPanel()">×</button>
+    </div>
+    <div id="statsContent"></div>
+</div>
+
 <script>
     let userId = "123";
+    let lastInteractionStats = null;
 
     async function fetchData(url, method='GET', isJson=true) {
         try {
@@ -70,12 +129,130 @@
 
     async function interact(contentId, type) {
         const method = document.getElementById('discoveryMethod').value;
-        const res = await fetchData(
+        const response = await fetch(
             `http://localhost:8080/content/${contentId}/${type}?discoveryMethod=${method}&userId=${userId}`,
-            'POST',
-            false
+            { method: 'POST' }
         );
-        res && alert(res);
+
+        if (response.ok) {
+            const stats = await response.json();
+            lastInteractionStats = stats;
+            showStatsPanel(stats);
+        } else {
+            alert('Error: ' + response.status);
+        }
+    }
+
+    function showStatsPanel(stats) {
+        const panel = document.getElementById('statsPanel');
+        const content = document.getElementById('statsContent');
+
+        // Basic info
+        let html = `
+            <div class="stats-section">
+                <h3>Basic Info</h3>
+                <div class="stats-row">
+                    <span class="stats-key">User ID:</span>
+                    <span class="stats-value">${stats.userId}</span>
+                </div>
+                <div class="stats-row">
+                    <span class="stats-key">Content ID:</span>
+                    <span class="stats-value">${stats.contentId}</span>
+                </div>
+                <div class="stats-row">
+                    <span class="stats-key">Interaction Type:</span>
+                    <span class="stats-value">${stats.interactionType}</span>
+                </div>
+                <div class="stats-row">
+                    <span class="stats-key">Discovery Method:</span>
+                    <span class="stats-value">${stats.discoveryMethod}</span>
+                </div>
+                <div class="stats-row">
+                    <span class="stats-key">Raw Base Score:</span>
+                    <span class="stats-value">${stats.rawBaseScore.toFixed(2)}</span>
+                </div>
+            </div>
+
+            <div class="stats-section">
+                <h3>Content Topics</h3>
+                <div>${Array.from(stats.contentTopics).join(', ')}</div>
+            </div>
+
+            <div class="stats-section">
+                <h3>Topic Calculations</h3>
+        `;
+
+        // Topic calculations
+        for (const [topic, calc] of Object.entries(stats.topicCalculations)) {
+            html += `
+                <div class="topic-stats">
+                    <h4>${topic}</h4>
+                    <div class="stats-row">
+                        <span class="stats-key">History Size:</span>
+                        <span class="stats-value">${calc.historySize}</span>
+                    </div>
+                    <div class="stats-row">
+                        <span class="stats-key">Consecutive Actions:</span>
+                        <span class="stats-value">${calc.consecutiveActions}</span>
+                    </div>
+                    <div class="stats-row">
+                        <span class="stats-key">Frequency Multiplier:</span>
+                        <span class="stats-value">${calc.frequencyMultiplier.toFixed(2)}</span>
+                    </div>
+                    <div class="stats-row">
+                        <span class="stats-key">Consecutive Multiplier:</span>
+                        <span class="stats-value">${calc.consecutiveMultiplier.toFixed(2)}</span>
+                    </div>
+                    <div class="stats-row">
+                        <span class="stats-key">Momentum:</span>
+                        <span class="stats-value">${calc.momentum.toFixed(2)}</span>
+                    </div>
+                    <div class="stats-row">
+                        <span class="stats-key">Amplified Score:</span>
+                        <span class="stats-value">${calc.amplifiedScore.toFixed(2)}</span>
+                    </div>
+                    <div class="stats-row">
+                        <span class="stats-key">Delta Score:</span>
+                        <span class="stats-value">${calc.deltaScore.toFixed(2)}</span>
+                    </div>
+                </div>
+            `;
+        }
+
+        html += `</div><div class="stats-section"><h3>Score Updates</h3>`;
+
+        // Score updates
+        for (const [topic, update] of Object.entries(stats.scoreUpdates)) {
+            html += `
+                <div class="topic-stats">
+                    <h4>${topic}</h4>
+                    <div class="stats-row">
+                        <span class="stats-key">Current Score:</span>
+                        <span class="stats-value">${update.currentScore.toFixed(2)}</span>
+                    </div>
+                    <div class="stats-row">
+                        <span class="stats-key">Delta:</span>
+                        <span class="stats-value">${update.delta.toFixed(2)}</span>
+                    </div>
+                    <div class="stats-row">
+                        <span class="stats-key">New Raw Score:</span>
+                        <span class="stats-value">${update.newRawScore.toFixed(2)}</span>
+                    </div>
+                    <div class="stats-row">
+                        <span class="stats-key">New Saturated Score:</span>
+                        <span class="stats-value">${update.newSaturatedScore.toFixed(2)}</span>
+                    </div>
+                </div>
+            `;
+        }
+
+        html += `</div>`;
+        content.innerHTML = html;
+        panel.style.display = 'block';
+    }
+
+    function closeStatsPanel() {
+        document.getElementById('statsPanel').style.display = 'none';
     }
 
     async function fetchCurrentTime() {
