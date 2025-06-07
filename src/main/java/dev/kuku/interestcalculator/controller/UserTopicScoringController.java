@@ -1,20 +1,33 @@
 package dev.kuku.interestcalculator.controller;
 
+import dev.kuku.interestcalculator.fakeDatabase.ContentDb;
 import dev.kuku.interestcalculator.fakeDatabase.UserInteractionsDb;
 import dev.kuku.interestcalculator.services.userTopicScoreAccumulator.UserTopicScoreAccumulatorService;
 import dev.kuku.interestcalculator.util.TestTimeProvider;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Profile;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 @RestController
 @RequiredArgsConstructor
 @Profile("test")
+@Slf4j
+@CrossOrigin(origins = "*")  // Add this annotation
 public class UserTopicScoringController {
     private final UserTopicScoreAccumulatorService userTopicScoreAccumulatorService;
     private final TestTimeProvider testTimeProvider;
     private final UserInteractionsDb userInteractionsDb;
+    private final ContentDb contentDb;
+
+    @GetMapping("/content")
+    public ResponseEntity<List<ContentDb.ContentRow>> getAllContents() {
+        log.debug("Getting all contents");
+        return ResponseEntity.ok(contentDb.getAllContents());
+    }
 
     @PostMapping("/content/{contentId}/{interactionType}")
     public ResponseEntity<String> interact(

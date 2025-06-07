@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Content Viewer</title>
+    <style>
+        body { font-family: Arial; margin: 0; display: flex; }
+        .sidebar { width: 200px; background: #f5f5f5; padding: 15px; }
+        .main { flex: 1; padding: 15px; }
+        .content { border: 1px solid #ddd; padding: 10px; margin-bottom: 10px; }
+        .topics { color: #666; font-size: 0.9em; margin: 5px 0; }
+        .meta { font-size: 0.8em; color: #888; }
+        button { margin: 2px; padding: 3px 6px; }
+        .section { margin-bottom: 15px; }
+        #currentTime { background: #f0f0f0; padding: 5px; }
+    </style>
+</head>
+<body>
+<div class="sidebar">
+    <div class="section">
+        <h3>Discovery Method</h3>
+        <select id="discoveryMethod">
+            <option>TRENDING</option>
+            <option>RECOMMENDATION</option>
+            <option>SEARCH</option>
+        </select>
+    </div>
+    <div class="section">
+        <h3>Time Control</h3>
+        <div id="currentTime">Loading...</div>
+        <button onclick="advanceTime(0,0,1)">+1m</button>
+        <button onclick="advanceTime(0,1,0)">+1h</button>
+        <button onclick="advanceTime(1,0,0)">+1d</button>
+    </div>
+</div>
+
+<div class="main">
+    <h1>Contents</h1>
+    <div id="contents"></div>
+</div>
+
+<script>
+    let userId = "123";
+
+    async function fetchData(url, method='GET', isJson=true) {
+        try {
+            const res = await fetch(url, {method});
+            return isJson ? res.json() : res.text();
+        } catch(e) {
+            console.error(e);
+            alert('Error: ' + e);
+        }
+    }
+
+    function displayContents(contents) {
+        document.getElementById('contents').innerHTML = contents.map(content => `
+        <div class="content">
+            <div>${content.content}</div>
+            <div class="topics">Topics: ${[...content.topics].join(', ')}</div>
+            <div class="meta">
+                ID: ${content.contentId} | User: ${content.userId} | ${new Date(content.timestamp).toLocaleString()}
+            </div>
+            <div>
+                ${['LIKE','DISLIKE','COMMENT','REPORT'].map(t =>
+            `<button onclick="interact('${content.contentId}','${t}')">${t}</button>`
+        ).join('')}
+            </div>
+        </div>
+    `).join('');
+    }
+
+    async function interact(contentId, type) {
+        const method = document.getElementById('discoveryMethod').value;
+        const res = await fetchData(
+            `http://localhost:8080/content/${contentId}/${type}?discoveryMethod=${method}&userId=${userId}`,
+            'POST',
+            false
+        );
+        res && alert(res);
+    }
+
+    async function fetchCurrentTime() {
+        const time = await fetchData('http://localhost:8080/api/current-time', 'GET', false);
+        time && (document.getElementById('currentTime').textContent = time);
+    }
+
+    async function advanceTime(d,h,m) {
+        const res = await fetchData(
+            `http://localhost:8080/api/advance-time?days=${d}&hours=${h}&minutes=${m}`,
+            'POST',
+            false
+        );
+        res && (alert(res), fetchCurrentTime());
+    }
+
+    // Init
+    fetchData('http://localhost:8080/content').then(displayContents);
+    fetchCurrentTime();
+</script>
+</body>
+</html>
