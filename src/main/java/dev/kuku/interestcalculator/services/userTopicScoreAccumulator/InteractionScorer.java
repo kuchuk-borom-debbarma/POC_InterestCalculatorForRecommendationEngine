@@ -41,8 +41,8 @@ public class InteractionScorer {
      */
     private static Map<String, Double> calculateScoreCache() {
         Map<String, Double> cache = new HashMap<>();
-        double minRawScore = Double.MIN_VALUE;
-        double maxRawScore = Double.MAX_VALUE;
+        double minRawScore = Double.POSITIVE_INFINITY;  // Fixed: Start with positive infinity
+        double maxRawScore = Double.NEGATIVE_INFINITY;  // Fixed: Start with negative infinity
 
         // Calculate all possible scores once and cache min/max
         for (UserInteractionsDb.Discovery discovery : UserInteractionsDb.Discovery.values()) {
@@ -77,16 +77,22 @@ public class InteractionScorer {
     }
 
     /**
-     * Normalize a value from one range to another
+     * Normalize a value from the raw score range to [-TARGET_MAX_POSSIBLE_DELTA, +TARGET_MAX_POSSIBLE_DELTA]
+     * The highest raw score maps to +TARGET_MAX_POSSIBLE_DELTA
+     * The lowest raw score maps to -TARGET_MAX_POSSIBLE_DELTA
      *
-     * @param value The value to normalize
-     * @return The normalized value
+     * @param value The raw score value to normalize
+     * @return The normalized value in range [-TARGET_MAX_POSSIBLE_DELTA, +TARGET_MAX_POSSIBLE_DELTA]
      */
     private double normalizeToRange(double value) {
-        if (InteractionScorer.MAX_RAW_SCORE == InteractionScorer.MIN_RAW_SCORE) {
-            return InteractionScorer.TARGET_MAX_POSSIBLE_DELTA;
+        // Handle edge case where all scores are the same
+        if (MAX_RAW_SCORE == MIN_RAW_SCORE) {
+            return 0.0; // Return neutral value
         }
-        return (value - InteractionScorer.MIN_RAW_SCORE) / (InteractionScorer.MAX_RAW_SCORE - InteractionScorer.MIN_RAW_SCORE) * (-1.0 - InteractionScorer.TARGET_MAX_POSSIBLE_DELTA) + InteractionScorer.TARGET_MAX_POSSIBLE_DELTA;
-    }
 
+        // Maps [MIN_RAW_SCORE, MAX_RAW_SCORE] to [-TARGET_MAX_POSSIBLE_DELTA, +TARGET_MAX_POSSIBLE_DELTA]
+        // Formula: 2 * ((value - min) / (max - min)) - 1, then scale by TARGET_MAX_POSSIBLE_DELTA
+        double normalizedToMinusOneToOne = 2.0 * (value - MIN_RAW_SCORE) / (MAX_RAW_SCORE - MIN_RAW_SCORE) - 1.0;
+        return normalizedToMinusOneToOne * TARGET_MAX_POSSIBLE_DELTA;
+    }
 }
