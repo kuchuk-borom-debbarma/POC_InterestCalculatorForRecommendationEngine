@@ -6,7 +6,6 @@ import org.springframework.stereotype.Repository;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Set;
 
 @Repository
 @RequiredArgsConstructor
@@ -28,7 +27,7 @@ public class UserInteractionsDb {
         return userInteractionRows.stream()
                 .filter(interaction -> interaction.userId.equals(userId))
                 .filter(interaction -> interaction.interactionTime >= from && interaction.interactionTime <= to)
-                .filter(interaction -> contentDb.getContentById(interaction.contentId).topics().contains(topic))
+                .filter(interaction -> contentDb.getContentById(interaction.contentId).getTopics().contains(topic))
                 .map(interaction -> copyInteraction(interaction)) // Create copies
                 .toList();
     }
