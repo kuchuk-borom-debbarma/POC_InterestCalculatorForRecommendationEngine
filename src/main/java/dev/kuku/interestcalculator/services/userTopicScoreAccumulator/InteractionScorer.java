@@ -2,6 +2,7 @@ package dev.kuku.interestcalculator.services.userTopicScoreAccumulator;
 
 import dev.kuku.interestcalculator.fakeDatabase.UserInteractionsDb;
 import org.springframework.stereotype.Component;
+
 import java.util.Map;
 import java.util.HashMap;
 
@@ -40,8 +41,8 @@ public class InteractionScorer {
      */
     private static Map<String, Double> calculateScoreCache() {
         Map<String, Double> cache = new HashMap<>();
-        double minRawScore = Double.MAX_VALUE;
-        double maxRawScore = Double.MIN_VALUE;
+        double minRawScore = Double.MIN_VALUE;
+        double maxRawScore = Double.MAX_VALUE;
 
         // Calculate all possible scores once and cache min/max
         for (UserInteractionsDb.Discovery discovery : UserInteractionsDb.Discovery.values()) {
@@ -69,47 +70,23 @@ public class InteractionScorer {
 
     public double calculateInteractionScoreDelta(UserInteractionsDb.Discovery contentDiscovery,
                                                  UserInteractionsDb.InteractionType interactionType) {
-        // Option 1: Calculate on-the-fly (original approach)
-        double discoveryScore = getDiscoveryScore(contentDiscovery);
-        double interactionWeight = getInteractionWeight(interactionType);
-        double rawScore = discoveryScore * interactionWeight;
 
-        // Option 2: Use cached value for better performance
-        // String cacheKey = contentDiscovery.name() + "_" + interactionType.name();
-        // double rawScore = SCORE_CACHE.get(cacheKey);
-
-        // Normalize the raw score to the target delta range
-        double normalizedDelta = normalizeToRange(rawScore, MIN_RAW_SCORE, MAX_RAW_SCORE, TARGET_MAX_POSSIBLE_DELTA, TARGET_MAX_POSSIBLE_DELTA * -1);
-
-        return normalizedDelta;
+        String cacheKey = contentDiscovery.name() + "_" + interactionType.name();
+        double rawScore = SCORE_CACHE.get(cacheKey);
+        return normalizeToRange(rawScore);
     }
 
     /**
      * Normalize a value from one range to another
      *
-     * @param value   The value to normalize
-     * @param fromMin The minimum of the source range
-     * @param fromMax The maximum of the source range
-     * @param toMin   The minimum of the target range
-     * @param toMax   The maximum of the target range
+     * @param value The value to normalize
      * @return The normalized value
      */
-    private double normalizeToRange(double value, double fromMin, double fromMax, double toMin, double toMax) {
-        // Handle edge case where source range is zero
-        if (fromMax == fromMin) {
-            return toMin;
+    private double normalizeToRange(double value) {
+        if (InteractionScorer.MAX_RAW_SCORE == InteractionScorer.MIN_RAW_SCORE) {
+            return InteractionScorer.TARGET_MAX_POSSIBLE_DELTA;
         }
-
-        // Linear normalization formula:
-        // newValue = (value - fromMin) / (fromMax - fromMin) * (toMax - toMin) + toMin
-        return (value - fromMin) / (fromMax - fromMin) * (toMax - toMin) + toMin;
+        return (value - InteractionScorer.MIN_RAW_SCORE) / (InteractionScorer.MAX_RAW_SCORE - InteractionScorer.MIN_RAW_SCORE) * (-1.0 - InteractionScorer.TARGET_MAX_POSSIBLE_DELTA) + InteractionScorer.TARGET_MAX_POSSIBLE_DELTA;
     }
 
-    private double getDiscoveryScore(UserInteractionsDb.Discovery discovery) {
-        return getDiscoveryMultiplier(discovery) * MAX_DISCOVERY_VALUE;
-    }
-
-    private double getInteractionWeight(UserInteractionsDb.InteractionType interactionType) {
-        return getInteractionMultiplier(interactionType) * MAX_INTERACTION_WEIGHT;
-    }
 }

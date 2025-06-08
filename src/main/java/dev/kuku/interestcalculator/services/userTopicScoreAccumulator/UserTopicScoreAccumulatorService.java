@@ -1,20 +1,21 @@
 package dev.kuku.interestcalculator.services.userTopicScoreAccumulator;
 
+import dev.kuku.interestcalculator.fakeDatabase.ContentDb;
 import dev.kuku.interestcalculator.fakeDatabase.TopicDb;
 import dev.kuku.interestcalculator.fakeDatabase.UserInteractionsDb;
 import dev.kuku.interestcalculator.fakeDatabase.UserTopicScoreDb;
 import dev.kuku.interestcalculator.services.LLMService;
-import dev.kuku.interestcalculator.fakeDatabase.ContentDb;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
-import java.util.Collections;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class UserTopicScoreAccumulatorService {
     private static final double MIN_SCORE = 0.0;
     private static final double MAX_SCORE = 10.0;
@@ -29,6 +30,7 @@ public class UserTopicScoreAccumulatorService {
     private final UserTopicScoreDb userTopicScoreDb;
 
     public void scoreInteraction(String userId, UserInteractionsDb.UserInteractionRow interaction) {
+        log.info("Scoring interaction: {}", interaction);
         ContentDb.ContentRow contentRow = contentDb.getContentById(interaction.contentId);
         Set<String> topics = contentRow.getTopics();
         if (topics == null || topics.isEmpty()) {
@@ -36,8 +38,9 @@ public class UserTopicScoreAccumulatorService {
             contentRow.setTopics(topics);
             topicDb.topics.addAll(topics);
         }
-        //interaction scoring. Applied to all topics.
+        //Interaction scoring. Applied to all topics.
         double delta = interactionScorer.calculateInteractionScoreDelta(interaction.contentDiscovery, interaction.interactionType);
+        log.info("Delta: {}", delta);
         //Per topic scoring
         Map<String, Double> scoreMap = topics.stream()
                 .collect(Collectors.toMap(t -> t, t -> {
@@ -45,8 +48,7 @@ public class UserTopicScoreAccumulatorService {
                     double topicDelta = topicScore * delta;
                     double currentScore = userTopicScoreDb.getCurrentScore(userId, t);
                     // Apply saturation using current score and the delta
-                    double updatedScoreWithSaturation = applySaturation(currentScore, topicDelta);
-                    return updatedScoreWithSaturation;
+                    return applySaturation(currentScore, topicDelta);
                 }));
         userTopicScoreDb.updateTopicScores(userId, scoreMap);
     }

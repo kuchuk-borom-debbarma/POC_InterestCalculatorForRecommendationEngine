@@ -2,6 +2,7 @@ package dev.kuku.interestcalculator.fakeDatabase;
 
 import lombok.AllArgsConstructor;
 import lombok.RequiredArgsConstructor;
+import lombok.ToString;
 import org.springframework.stereotype.Repository;
 
 import java.util.ArrayList;
@@ -57,6 +58,7 @@ public class UserInteractionsDb {
     }
 
     @AllArgsConstructor
+    @ToString
     public static class UserInteractionRow {
         public String userId;
         public String contentId;
