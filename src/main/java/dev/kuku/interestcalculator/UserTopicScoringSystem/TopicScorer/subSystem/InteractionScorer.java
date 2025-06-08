@@ -1,4 +1,4 @@
-package dev.kuku.interestcalculator.services.userTopicScoreAccumulator;
+package dev.kuku.interestcalculator.UserTopicScoringSystem.TopicScorer.subSystem;
 
 import dev.kuku.interestcalculator.fakeDatabase.UserInteractionsDb;
 import org.springframework.stereotype.Component;

@@ -1,5 +1,7 @@
-package dev.kuku.interestcalculator.services.userTopicScoreAccumulator;
+package dev.kuku.interestcalculator.UserTopicScoringSystem.TopicScorer;
 
+import dev.kuku.interestcalculator.UserTopicScoringSystem.TopicScorer.subSystem.InteractionScorer;
+import dev.kuku.interestcalculator.UserTopicScoringSystem.TopicScorer.subSystem.InteractionTopicScorer;
 import dev.kuku.interestcalculator.fakeDatabase.ContentDb;
 import dev.kuku.interestcalculator.fakeDatabase.TopicDb;
 import dev.kuku.interestcalculator.fakeDatabase.UserInteractionsDb;
@@ -7,16 +9,19 @@ import dev.kuku.interestcalculator.fakeDatabase.UserTopicScoreDb;
 import dev.kuku.interestcalculator.services.LLMService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Service;
+import org.springframework.stereotype.Component;
 
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-@Service
+/**
+ * Calculates topic score based on interaction.
+ */
+@Component
 @RequiredArgsConstructor
 @Slf4j
-public class UserTopicScoreAccumulatorService {
+public class UserTopicInteractionScorer {
     private static final double MIN_SCORE = 0.0;
     private static final double MAX_SCORE = 10.0;
     public static final double SATURATION_STRENGTH = 0.2;
