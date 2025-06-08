@@ -54,6 +54,12 @@ public class UserTopicScoreDb {
                 .orElse(0.0);
     }
 
+    public List<UserTopicScoreRow> getUserTopicScores(String userId) {
+        return userTopicScores.stream()
+                .filter(row -> row.userId.equals(userId))
+                .toList();
+    }
+
 
     @AllArgsConstructor
     public static class UserTopicScoreRow {

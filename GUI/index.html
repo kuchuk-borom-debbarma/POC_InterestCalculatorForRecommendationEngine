@@ -13,55 +13,19 @@
         .section { margin-bottom: 15px; }
         #currentTime { background: #f0f0f0; padding: 5px; }
         .stats-panel {
-            position: fixed;
-            top: 0;
-            right: 0;
-            width: 400px;
-            height: 100vh;
-            background: white;
-            box-shadow: -2px 0 5px rgba(0,0,0,0.1);
-            padding: 15px;
-            overflow-y: auto;
-            display: none;
+            position: fixed; top: 0; right: 0; width: 400px; height: 100vh; background: white;
+            box-shadow: -2px 0 5px rgba(0,0,0,0.1); padding: 15px; overflow-y: auto; display: none;
         }
-        .stats-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 10px;
-        }
-        .stats-section {
-            margin-bottom: 15px;
-            padding: 10px;
-            background: #f9f9f9;
-            border-radius: 5px;
-        }
-        .stats-section h3 {
-            margin-top: 0;
-            color: #444;
-            border-bottom: 1px solid #eee;
-            padding-bottom: 5px;
-        }
-        .stats-row {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 5px;
-        }
+        .stats-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+        .stats-section { margin-bottom: 15px; padding: 10px; background: #f9f9f9; border-radius: 5px; }
+        .stats-section h3 { margin-top: 0; color: #444; border-bottom: 1px solid #eee; padding-bottom: 5px; }
+        .stats-row { display: flex; justify-content: space-between; margin-bottom: 5px; }
         .stats-key { font-weight: bold; color: #555; }
         .stats-value { color: #333; }
-        .topic-stats {
-            margin-top: 10px;
-            padding: 8px;
-            background: #fff;
-            border: 1px solid #eee;
-            border-radius: 4px;
-        }
-        .close-btn {
-            background: #eee;
-            border: none;
-            padding: 3px 8px;
-            cursor: pointer;
-        }
+        .topic-stats { margin-top: 10px; padding: 8px; background: #fff; border: 1px solid #eee; border-radius: 4px; }
+        .close-btn { background: #eee; border: none; padding: 3px 8px; cursor: pointer; }
+        #userScores { background: #e8f4f8; padding: 8px; margin-top: 10px; border-radius: 4px; font-size: 0.85em; }
+        .score-item { display: flex; justify-content: space-between; margin: 2px 0; }
     </style>
 </head>
 <body>
@@ -81,6 +45,11 @@
         <button onclick="advanceTime(0,1,0)">+1h</button>
         <button onclick="advanceTime(1,0,0)">+1d</button>
     </div>
+    <div class="section">
+        <h3>User Scores</h3>
+        <button onclick="fetchUserScores()">Refresh Scores</button>
+        <div id="userScores">Click to load...</div>
+    </div>
 </div>
 
 <div class="main">
@@ -98,7 +67,6 @@
 
 <script>
     let userId = "123";
-    let lastInteractionStats = null;
 
     async function fetchData(url, method='GET', isJson=true) {
         try {
@@ -115,145 +83,72 @@
         <div class="content">
             <div>${content.content}</div>
             <div class="topics">Topics: ${[...content.topics].join(', ')}</div>
-            <div class="meta">
-                ID: ${content.contentId} | User: ${content.userId} | ${new Date(content.timestamp).toLocaleString()}
-            </div>
-            <div>
-                ${['LIKE','DISLIKE','COMMENT','REPORT'].map(t =>
-            `<button onclick="interact('${content.contentId}','${t}')">${t}</button>`
-        ).join('')}
-            </div>
-        </div>
-    `).join('');
+            <div class="meta">ID: ${content.contentId} | User: ${content.userId} | ${new Date(content.timestamp).toLocaleString()}</div>
+            <div>${['LIKE','DISLIKE','COMMENT','REPORT'].map(t => `<button onclick="interact('${content.contentId}','${t}')">${t}</button>`).join('')}</div>
+        </div>`).join('');
     }
 
     async function interact(contentId, type) {
         const method = document.getElementById('discoveryMethod').value;
-        const response = await fetch(
-            `http://localhost:8080/content/${contentId}/${type}?discoveryMethod=${method}&userId=${userId}`,
-            { method: 'POST' }
-        );
-
+        const response = await fetch(`http://localhost:8080/content/${contentId}/${type}?discoveryMethod=${method}&userId=${userId}`, { method: 'POST' });
         if (response.ok) {
             const stats = await response.json();
-            lastInteractionStats = stats;
             showStatsPanel(stats);
+            fetchUserScores(); // Auto-refresh scores after interaction
         } else {
             alert('Error: ' + response.status);
+        }
+    }
+
+    async function fetchUserScores() {
+        const scores = await fetchData(`http://localhost:8080/api/userScore/${userId}`);
+        if (scores) {
+            const sorted = scores.sort((a, b) => b.interestScore - a.interestScore);
+            document.getElementById('userScores').innerHTML = sorted.map(s =>
+                `<div class="score-item"><span>${s.topic}</span><span>${s.interestScore.toFixed(1)}</span></div>`
+            ).join('') || 'No scores yet';
         }
     }
 
     function showStatsPanel(stats) {
         const panel = document.getElementById('statsPanel');
         const content = document.getElementById('statsContent');
+        let html = `<div class="stats-section"><h3>Basic Info</h3>
+            <div class="stats-row"><span class="stats-key">User ID:</span><span class="stats-value">${stats.userId}</span></div>
+            <div class="stats-row"><span class="stats-key">Content ID:</span><span class="stats-value">${stats.contentId}</span></div>
+            <div class="stats-row"><span class="stats-key">Interaction Type:</span><span class="stats-value">${stats.interactionType}</span></div>
+            <div class="stats-row"><span class="stats-key">Discovery Method:</span><span class="stats-value">${stats.discoveryMethod}</span></div>
+            <div class="stats-row"><span class="stats-key">Raw Base Score:</span><span class="stats-value">${stats.rawBaseScore.toFixed(2)}</span></div>
+        </div><div class="stats-section"><h3>Content Topics</h3><div>${Array.from(stats.contentTopics).join(', ')}</div></div>
+        <div class="stats-section"><h3>Topic Calculations</h3>`;
 
-        // Basic info
-        let html = `
-            <div class="stats-section">
-                <h3>Basic Info</h3>
-                <div class="stats-row">
-                    <span class="stats-key">User ID:</span>
-                    <span class="stats-value">${stats.userId}</span>
-                </div>
-                <div class="stats-row">
-                    <span class="stats-key">Content ID:</span>
-                    <span class="stats-value">${stats.contentId}</span>
-                </div>
-                <div class="stats-row">
-                    <span class="stats-key">Interaction Type:</span>
-                    <span class="stats-value">${stats.interactionType}</span>
-                </div>
-                <div class="stats-row">
-                    <span class="stats-key">Discovery Method:</span>
-                    <span class="stats-value">${stats.discoveryMethod}</span>
-                </div>
-                <div class="stats-row">
-                    <span class="stats-key">Raw Base Score:</span>
-                    <span class="stats-value">${stats.rawBaseScore.toFixed(2)}</span>
-                </div>
-            </div>
-
-            <div class="stats-section">
-                <h3>Content Topics</h3>
-                <div>${Array.from(stats.contentTopics).join(', ')}</div>
-            </div>
-
-            <div class="stats-section">
-                <h3>Topic Calculations</h3>
-        `;
-
-        // Topic calculations
         for (const [topic, calc] of Object.entries(stats.topicCalculations)) {
-            html += `
-                <div class="topic-stats">
-                    <h4>${topic}</h4>
-                    <div class="stats-row">
-                        <span class="stats-key">History Size:</span>
-                        <span class="stats-value">${calc.historySize}</span>
-                    </div>
-                    <div class="stats-row">
-                        <span class="stats-key">Consecutive Actions:</span>
-                        <span class="stats-value">${calc.consecutiveActions}</span>
-                    </div>
-                    <div class="stats-row">
-                        <span class="stats-key">Frequency Multiplier:</span>
-                        <span class="stats-value">${calc.frequencyMultiplier.toFixed(2)}</span>
-                    </div>
-                    <div class="stats-row">
-                        <span class="stats-key">Consecutive Multiplier:</span>
-                        <span class="stats-value">${calc.consecutiveMultiplier.toFixed(2)}</span>
-                    </div>
-                    <div class="stats-row">
-                        <span class="stats-key">Momentum:</span>
-                        <span class="stats-value">${calc.momentum.toFixed(2)}</span>
-                    </div>
-                    <div class="stats-row">
-                        <span class="stats-key">Amplified Score:</span>
-                        <span class="stats-value">${calc.amplifiedScore.toFixed(2)}</span>
-                    </div>
-                    <div class="stats-row">
-                        <span class="stats-key">Delta Score:</span>
-                        <span class="stats-value">${calc.deltaScore.toFixed(2)}</span>
-                    </div>
-                </div>
-            `;
+            html += `<div class="topic-stats"><h4>${topic}</h4>
+                <div class="stats-row"><span class="stats-key">History Size:</span><span class="stats-value">${calc.historySize}</span></div>
+                <div class="stats-row"><span class="stats-key">Consecutive Actions:</span><span class="stats-value">${calc.consecutiveActions}</span></div>
+                <div class="stats-row"><span class="stats-key">Frequency Multiplier:</span><span class="stats-value">${calc.frequencyMultiplier.toFixed(2)}</span></div>
+                <div class="stats-row"><span class="stats-key">Consecutive Multiplier:</span><span class="stats-value">${calc.consecutiveMultiplier.toFixed(2)}</span></div>
+                <div class="stats-row"><span class="stats-key">Momentum:</span><span class="stats-value">${calc.momentum.toFixed(2)}</span></div>
+                <div class="stats-row"><span class="stats-key">Amplified Score:</span><span class="stats-value">${calc.amplifiedScore.toFixed(2)}</span></div>
+                <div class="stats-row"><span class="stats-key">Delta Score:</span><span class="stats-value">${calc.deltaScore.toFixed(2)}</span></div>
+            </div>`;
         }
 
         html += `</div><div class="stats-section"><h3>Score Updates</h3>`;
-
-        // Score updates
         for (const [topic, update] of Object.entries(stats.scoreUpdates)) {
-            html += `
-                <div class="topic-stats">
-                    <h4>${topic}</h4>
-                    <div class="stats-row">
-                        <span class="stats-key">Current Score:</span>
-                        <span class="stats-value">${update.currentScore.toFixed(2)}</span>
-                    </div>
-                    <div class="stats-row">
-                        <span class="stats-key">Delta:</span>
-                        <span class="stats-value">${update.delta.toFixed(2)}</span>
-                    </div>
-                    <div class="stats-row">
-                        <span class="stats-key">New Raw Score:</span>
-                        <span class="stats-value">${update.newRawScore.toFixed(2)}</span>
-                    </div>
-                    <div class="stats-row">
-                        <span class="stats-key">New Saturated Score:</span>
-                        <span class="stats-value">${update.newSaturatedScore.toFixed(2)}</span>
-                    </div>
-                </div>
-            `;
+            html += `<div class="topic-stats"><h4>${topic}</h4>
+                <div class="stats-row"><span class="stats-key">Current Score:</span><span class="stats-value">${update.currentScore.toFixed(2)}</span></div>
+                <div class="stats-row"><span class="stats-key">Delta:</span><span class="stats-value">${update.delta.toFixed(2)}</span></div>
+                <div class="stats-row"><span class="stats-key">New Raw Score:</span><span class="stats-value">${update.newRawScore.toFixed(2)}</span></div>
+                <div class="stats-row"><span class="stats-key">New Saturated Score:</span><span class="stats-value">${update.newSaturatedScore.toFixed(2)}</span></div>
+            </div>`;
         }
-
         html += `</div>`;
         content.innerHTML = html;
         panel.style.display = 'block';
     }
 
-    function closeStatsPanel() {
-        document.getElementById('statsPanel').style.display = 'none';
-    }
+    function closeStatsPanel() { document.getElementById('statsPanel').style.display = 'none'; }
 
     async function fetchCurrentTime() {
         const time = await fetchData('http://localhost:8080/api/current-time', 'GET', false);
@@ -261,17 +156,14 @@
     }
 
     async function advanceTime(d,h,m) {
-        const res = await fetchData(
-            `http://localhost:8080/api/advance-time?days=${d}&hours=${h}&minutes=${m}`,
-            'POST',
-            false
-        );
+        const res = await fetchData(`http://localhost:8080/api/advance-time?days=${d}&hours=${h}&minutes=${m}`, 'POST', false);
         res && (alert(res), fetchCurrentTime());
     }
 
     // Init
     fetchData('http://localhost:8080/content').then(displayContents);
     fetchCurrentTime();
+    fetchUserScores();
 </script>
 </body>
 </html>

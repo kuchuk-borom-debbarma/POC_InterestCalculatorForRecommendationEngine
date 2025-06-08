@@ -3,6 +3,7 @@ package dev.kuku.interestcalculator.controller;
 import dev.kuku.interestcalculator.dto.OperationDetailMap;
 import dev.kuku.interestcalculator.fakeDatabase.ContentDb;
 import dev.kuku.interestcalculator.fakeDatabase.UserInteractionsDb;
+import dev.kuku.interestcalculator.fakeDatabase.UserTopicScoreDb;
 import dev.kuku.interestcalculator.services.userTopicScoreAccumulator.UserTopicScoreAccumulatorService;
 import dev.kuku.interestcalculator.util.TestTimeProvider;
 import lombok.RequiredArgsConstructor;
@@ -25,6 +26,7 @@ public class UserTopicScoringController {
     private final UserInteractionsDb userInteractionsDb;
     private final ContentDb contentDb;
     private final OperationDetailMap operationDetailMap;
+    private final UserTopicScoreDb userTopicScoreDb;
 
     @GetMapping("/content")
     public ResponseEntity<List<ContentDb.ContentRow>> getAllContents() {
@@ -47,7 +49,7 @@ public class UserTopicScoringController {
                     userId, contentId, discovery, interaction, currentTime
             );
 
-            userTopicScoreAccumulatorService.accumulate(userId, interactionRow);
+            userTopicScoreAccumulatorService.scoreInteraction(userId, interactionRow);
             userInteractionsDb.addInteraction(userId, contentId, discovery, interaction, currentTime);
             return ResponseEntity.ok(operationDetailMap.operationDetailMap);
         } catch (IllegalArgumentException e) {
@@ -81,6 +83,16 @@ public class UserTopicScoringController {
             return ResponseEntity.ok(currentTime.toString());
         } catch (Exception e) {
             return ResponseEntity.internalServerError().body("Error getting current time");
+        }
+    }
+
+    @GetMapping("/api/userScore/{userId}")
+    public ResponseEntity<List<UserTopicScoreDb.UserTopicScoreRow>> getUserScore(@PathVariable("userId") String userId) {
+        try {
+            return ResponseEntity.ok(userTopicScoreDb.getUserTopicScores(userId));
+        } catch (Exception e) {
+            log.error("Error while getting user score", e);
+            return ResponseEntity.internalServerError().build();
         }
     }
 }

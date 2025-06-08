@@ -1,12 +1,13 @@
 package dev.kuku.interestcalculator.fakeDatabase;
 
 import jakarta.annotation.PostConstruct;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.Setter;
 import org.springframework.stereotype.Repository;
+import org.springframework.stereotype.Service;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 @Repository
 public class ContentDb {
@@ -165,7 +166,16 @@ public class ContentDb {
         contentTopicRows.put(contentId, new ContentRow(contentId, contentTopicRows.get(contentId).content, topics, contentTopicRows.get(contentId).userId, contentTopicRows.get(contentId).timestamp));
     }
 
-    public static record ContentRow(String contentId, String content, Set<String> topics, String userId,
-                                    long timestamp) {
+    @Getter
+    @Setter
+    @AllArgsConstructor
+    public static final class ContentRow {
+        private String contentId;
+        private String content;
+        private Set<String> topics;
+        private String userId;
+        private long timestamp;
+
+
     }
 }
