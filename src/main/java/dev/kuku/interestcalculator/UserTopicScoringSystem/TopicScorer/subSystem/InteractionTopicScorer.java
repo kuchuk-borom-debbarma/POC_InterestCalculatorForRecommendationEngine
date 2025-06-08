@@ -4,7 +4,12 @@ import org.springframework.stereotype.Component;
 
 @Component
 public class InteractionTopicScorer {
-    //TODO DIMINISHING return for burst activity
+    /**
+     * Should return delta
+     * @param userId
+     * @param t
+     * @return
+     */
     public double scoreTopic(String userId, String t) {
         return 1.0;
     }

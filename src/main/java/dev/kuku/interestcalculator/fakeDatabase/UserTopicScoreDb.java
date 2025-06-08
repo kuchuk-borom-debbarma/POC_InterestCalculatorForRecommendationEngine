@@ -11,17 +11,12 @@ import java.util.Optional;
 
 @Repository
 public class UserTopicScoreDb {
-
     private final List<UserTopicScoreRow> userTopicScores = new ArrayList<>();
 
-    /**
-     * Updates topic scores for a user. If a topic doesn't exist, creates a new entry.
-     * If it exists, updates the score and timestamp.
-     */
-    public void updateTopicScores(String userId, Map<String, Double> topicScores) {
+    public void updateTopicScoresByValue(String userId, Map<String, Double> value) {
         long currentTime = Instant.now().toEpochMilli();
 
-        for (Map.Entry<String, Double> entry : topicScores.entrySet()) {
+        for (Map.Entry<String, Double> entry : value.entrySet()) {
             String topic = entry.getKey();
             double newScore = entry.getValue();
 
@@ -42,11 +37,31 @@ public class UserTopicScoreDb {
         }
     }
 
-    /**
-     * Gets the current accumulated score for a specific user-topic pair.
-     * Returns 0.0 if no score exists yet.
-     */
-    public double getCurrentScore(String userId, String topic) {
+    public void updateTopicScoresByDelta(String userId, Map<String, Double> delta) {
+        long currentTime = Instant.now().toEpochMilli();
+
+        for (Map.Entry<String, Double> entry : delta.entrySet()) {
+            String topic = entry.getKey();
+            double deltaValue = entry.getValue();
+
+            // Find existing score entry
+            Optional<UserTopicScoreRow> existingRow = userTopicScores.stream()
+                    .filter(row -> row.userId.equals(userId) && row.topic.equals(topic))
+                    .findFirst();
+
+            if (existingRow.isPresent()) {
+                // Update existing entry by adding delta to current score
+                UserTopicScoreRow row = existingRow.get();
+                row.interestScore += deltaValue;
+                row.updatedAt = currentTime;
+            } else {
+                // Create new entry with delta as initial score
+                userTopicScores.add(new UserTopicScoreRow(userId, topic, deltaValue, currentTime));
+            }
+        }
+    }
+
+    public double getTopicScoreOfUser(String userId, String topic) {
         return userTopicScores.stream()
                 .filter(row -> row.userId.equals(userId) && row.topic.equals(topic))
                 .findFirst()

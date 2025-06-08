@@ -1,7 +1,5 @@
 package dev.kuku.interestcalculator.util;
 
-import org.springframework.stereotype.Component;
-
 import java.time.Instant;
 
 public interface TimeProvider {

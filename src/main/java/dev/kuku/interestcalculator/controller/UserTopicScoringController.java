@@ -1,10 +1,10 @@
 package dev.kuku.interestcalculator.controller;
 
+import dev.kuku.interestcalculator.UserTopicScoringSystem.UserTopicScoringSystem;
 import dev.kuku.interestcalculator.dto.OperationDetailMap;
 import dev.kuku.interestcalculator.fakeDatabase.ContentDb;
 import dev.kuku.interestcalculator.fakeDatabase.UserInteractionsDb;
 import dev.kuku.interestcalculator.fakeDatabase.UserTopicScoreDb;
-import dev.kuku.interestcalculator.UserTopicScoringSystem.TopicScorer.UserTopicInteractionScorer;
 import dev.kuku.interestcalculator.util.TestTimeProvider;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -21,7 +21,7 @@ import java.util.Map;
 @Slf4j
 @CrossOrigin(origins = "*")  // Add this annotation
 public class UserTopicScoringController {
-    private final UserTopicInteractionScorer userTopicInteractionScorer;
+    private final UserTopicScoringSystem userTopicScoringSystem;
     private final TestTimeProvider testTimeProvider;
     private final UserInteractionsDb userInteractionsDb;
     private final ContentDb contentDb;
@@ -49,7 +49,7 @@ public class UserTopicScoringController {
                     userId, contentId, discovery, interaction, currentTime
             );
 
-            userTopicInteractionScorer.scoreInteraction(userId, interactionRow);
+            userTopicScoringSystem.updateUserTopicScores(userId, interactionRow);
             userInteractionsDb.addInteraction(userId, contentId, discovery, interaction, currentTime);
             return ResponseEntity.ok(operationDetailMap.operationDetailMap);
         } catch (IllegalArgumentException e) {

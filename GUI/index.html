@@ -122,7 +122,6 @@
 
     async function advanceTime(d,h,m) {
         const res = await fetchData(`http://localhost:8080/api/advance-time?days=${d}&hours=${h}&minutes=${m}`, 'POST', false);
-        alert(res || 'Failed');
         fetchCurrentTime();
         document.getElementById('timeAdvance').textContent = '';
     }

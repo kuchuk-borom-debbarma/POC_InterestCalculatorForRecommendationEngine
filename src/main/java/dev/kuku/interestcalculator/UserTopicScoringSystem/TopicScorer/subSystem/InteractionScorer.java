@@ -68,6 +68,9 @@ public class InteractionScorer {
         return cache;
     }
 
+    /**
+     * Should return delta
+     */
     public double calculateInteractionScoreDelta(UserInteractionsDb.Discovery contentDiscovery,
                                                  UserInteractionsDb.InteractionType interactionType) {
 

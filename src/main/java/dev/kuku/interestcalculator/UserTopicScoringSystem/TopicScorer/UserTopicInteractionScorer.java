@@ -52,11 +52,11 @@ public class UserTopicInteractionScorer {
                 .collect(Collectors.toMap(t -> t, t -> {
                     double topicScore = interactionTopicScorer.scoreTopic(userId, t);
                     double topicDelta = topicScore * delta;
-                    double currentScore = userTopicScoreDb.getCurrentScore(userId, t);
+                    double currentScore = userTopicScoreDb.getTopicScoreOfUser(userId, t);
                     // Apply saturation using current score and the delta
                     return applySaturation(currentScore, topicDelta);
                 }));
-        userTopicScoreDb.updateTopicScores(userId, scoreMap);
+        userTopicScoreDb.updateTopicScoresByValue(userId, scoreMap);
     }
 
     /**
@@ -65,7 +65,7 @@ public class UserTopicInteractionScorer {
      * having more resistance near MAX_SCORE than negative deltas near MIN_SCORE.
      *
      * @param currentScore The current score before applying the delta
-     * @param delta The change to apply (can be positive or negative)
+     * @param delta        The change to apply (can be positive or negative)
      * @return The new score with saturation applied
      */
     private double applySaturation(double currentScore, double delta) {

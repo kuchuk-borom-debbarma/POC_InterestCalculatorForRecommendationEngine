@@ -10,12 +10,14 @@ import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
-public class UserTopicsScoreDecayerService {
+public class UserTopicsScoreDecayer {
     private final UserTopicScoreDb userTopicScoreDb;
     private final TopicScoreTemporalExponentialDecayer exponentialDecayer;
 
     public void decayScore(String userId) {
-        userTopicScoreDb.getUserTopicScores(userId).forEach(exponentialDecayer::decay);
+        Map<String, Double> delta = userTopicScoreDb.getUserTopicScores(userId)
+                .stream().collect(Collectors.toMap(row -> row.topic, exponentialDecayer::decay));
 
+        userTopicScoreDb.updateTopicScoresByDelta(userId, delta);
     }
 }
