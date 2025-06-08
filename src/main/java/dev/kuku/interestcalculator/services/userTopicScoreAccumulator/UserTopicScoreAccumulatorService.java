@@ -19,6 +19,7 @@ import java.util.stream.Collectors;
 public class UserTopicScoreAccumulatorService {
     private static final double MIN_SCORE = 0.0;
     private static final double MAX_SCORE = 10.0;
+    public static final double SATURATION_STRENGTH = 0.2;
 
     //Base interaction score
     private final InteractionScorer interactionScorer;
@@ -68,7 +69,7 @@ public class UserTopicScoreAccumulatorService {
         if (delta > 0) {
             // Logarithmic approach to max - gets harder as we approach MAX_SCORE
             double remaining = MAX_SCORE - currentScore;
-            double saturationFactor = (remaining / MAX_SCORE) * 0.8; // 0.8 = saturation strength
+            double saturationFactor = (remaining / MAX_SCORE) * SATURATION_STRENGTH;
             double saturatedDelta = delta * saturationFactor;
             return Math.min(MAX_SCORE, currentScore + saturatedDelta);
         } else {

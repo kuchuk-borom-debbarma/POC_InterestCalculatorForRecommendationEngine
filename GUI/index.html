@@ -12,6 +12,7 @@
         button { margin: 2px; padding: 3px 6px; }
         .section { margin-bottom: 15px; }
         #currentTime { background: #f0f0f0; padding: 5px; }
+        #timeAdvance { background: #e8f5e8; padding: 3px; font-size: 0.8em; color: #2e7d32; margin-top: 3px; }
         .stats-panel { position: fixed; top: 0; right: 0; width: 400px; height: 100vh; background: white; box-shadow: -2px 0 5px rgba(0,0,0,0.1); padding: 15px; overflow-y: auto; display: none; }
         .stats-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
         .close-btn { background: #eee; border: none; padding: 3px 8px; cursor: pointer; }
@@ -30,6 +31,7 @@
     <div class="section">
         <h3>Time Control</h3>
         <div id="currentTime">Loading...</div>
+        <div id="timeAdvance"></div>
         <button onclick="advanceTime(0,0,1)">+1m</button>
         <button onclick="advanceTime(0,1,0)">+1h</button>
         <button onclick="advanceTime(1,0,0)">+1d</button>
@@ -72,9 +74,22 @@
         </div>`).join('');
     }
 
+    async function autoAdvanceTime() {
+        const r = Math.random();
+        const h = r < 0.15 ? 1 : 0; // 15% chance for 1 hour
+        const m = r < 0.15 ? Math.floor(Math.random() * 30) + 5 : Math.floor(Math.random() * 10) + 1; // 5-35min if hour, else 1-10min
+
+        const res = await fetchData(`http://localhost:8080/api/advance-time?days=0&hours=${h}&minutes=${m}`, 'POST', false);
+        const advanceText = h > 0 ? `+${h}h ${m}m` : `+${m}m`;
+        document.getElementById('timeAdvance').textContent = `Auto: ${advanceText}`;
+        fetchCurrentTime();
+        return res;
+    }
+
     async function interact(contentId, type) {
         if (!contentId) return showResponse('No content ID', true);
         try {
+            await autoAdvanceTime();
             const method = document.getElementById('discoveryMethod').value;
             const res = await fetch(`http://localhost:8080/content/${contentId}/${type}?discoveryMethod=${method}&userId=${userId}`, {method: 'POST'});
             const text = await res.text();
@@ -109,6 +124,7 @@
         const res = await fetchData(`http://localhost:8080/api/advance-time?days=${d}&hours=${h}&minutes=${m}`, 'POST', false);
         alert(res || 'Failed');
         fetchCurrentTime();
+        document.getElementById('timeAdvance').textContent = '';
     }
 
     fetchData('http://localhost:8080/content').then(displayContents);
