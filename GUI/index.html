@@ -3,23 +3,25 @@
 <head>
     <title>Content Viewer</title>
     <style>
-        body { font-family: Arial; margin: 0; display: flex; }
-        .sidebar { width: 200px; background: #f5f5f5; padding: 15px; }
-        .main { flex: 1; padding: 15px; }
-        .content { border: 1px solid #ddd; padding: 10px; margin-bottom: 10px; }
-        .topics { color: #666; font-size: 0.9em; margin: 5px 0; }
-        .meta { font-size: 0.8em; color: #888; }
-        button { margin: 2px; padding: 3px 6px; }
-        .section { margin-bottom: 15px; }
-        #currentTime { background: #f0f0f0; padding: 5px; }
-        #timeAdvance { background: #e8f5e8; padding: 3px; font-size: 0.8em; color: #2e7d32; margin-top: 3px; }
-        .stats-panel { position: fixed; top: 0; right: 0; width: 400px; height: 100vh; background: white; box-shadow: -2px 0 5px rgba(0,0,0,0.1); padding: 15px; overflow-y: auto; display: none; }
-        .stats-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
-        .close-btn { background: #eee; border: none; padding: 3px 8px; cursor: pointer; }
-        #userScores { background: #e8f4f8; padding: 8px; margin-top: 10px; border-radius: 4px; font-size: 0.85em; }
-        .score-item { display: flex; justify-content: space-between; margin: 2px 0; }
-        .error { color: #d32f2f; background: #ffebee; padding: 5px; border-radius: 3px; }
-        .response { background: #f8f8f8; padding: 10px; border-radius: 4px; font-family: monospace; white-space: pre-wrap; font-size: 0.9em; border: 1px solid #ddd; }
+        body{font-family:Arial;margin:0;display:flex}
+        .sidebar{width:200px;background:#f5f5f5;padding:15px}
+        .main{flex:1;padding:15px}
+        .content{border:1px solid #ddd;padding:10px;margin-bottom:10px}
+        .topics{color:#666;font-size:0.9em;margin:5px 0}
+        .meta{font-size:0.8em;color:#888}
+        button{margin:2px;padding:3px 6px}
+        .section{margin-bottom:15px}
+        #currentTime{background:#f0f0f0;padding:5px}
+        #timeAdvance{background:#e8f5e8;padding:3px;font-size:0.8em;color:#2e7d32;margin-top:3px}
+        .stats-panel{position:fixed;top:0;right:0;width:400px;height:100vh;background:white;box-shadow:-2px 0 5px rgba(0,0,0,0.1);padding:15px;overflow-y:auto;display:none}
+        .stats-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+        .close-btn{background:#eee;border:none;padding:3px 8px;cursor:pointer}
+        #userScores{background:#e8f4f8;padding:8px;margin-top:10px;border-radius:4px;font-size:0.85em}
+        .score-item{display:flex;justify-content:space-between;margin:2px 0}
+        .error{color:#d32f2f;background:#ffebee;padding:5px;border-radius:3px}
+        .response{background:#f8f8f8;padding:10px;border-radius:4px;font-family:monospace;white-space:pre-wrap;font-size:0.9em;border:1px solid #ddd}
+        input{width:40px;margin:2px}
+        .time-row{display:flex;align-items:center;margin:3px 0}
     </style>
 </head>
 <body>
@@ -32,9 +34,11 @@
         <h3>Time Control</h3>
         <div id="currentTime">Loading...</div>
         <div id="timeAdvance"></div>
-        <button onclick="advanceTime(0,0,1)">+1m</button>
-        <button onclick="advanceTime(0,1,0)">+1h</button>
-        <button onclick="advanceTime(1,0,0)">+1d</button>
+        <div class="time-row">Year: <input id="y" type="number" min="0" value="0"><button onclick="advanceTime()">+</button></div>
+        <div class="time-row">Month: <input id="mo" type="number" min="0" value="0"></div>
+        <div class="time-row">Day: <input id="d" type="number" min="0" value="0"></div>
+        <div class="time-row">Hour: <input id="h" type="number" min="0" value="0"></div>
+        <div class="time-row">Min: <input id="m" type="number" min="0" value="0"></div>
     </div>
     <div class="section">
         <h3>User Scores</h3>
@@ -55,78 +59,68 @@
 </div>
 
 <script>
-    let userId = "123";
+    const userId = "123", base = "http://localhost:8080";
 
-    async function fetchData(url, method='GET', isJson=true) {
-        try {
-            const res = await fetch(url, {method});
-            return isJson ? res.json() : res.text();
-        } catch(e) { return null; }
-    }
+    const get = (id) => document.getElementById(id);
+    const fetchData = async (url, method='GET', json=true) => {
+        try { const r = await fetch(url, {method}); return json ? r.json() : r.text(); } catch(e) { return null; }
+    };
 
-    function displayContents(contents) {
-        document.getElementById('contents').innerHTML = (contents||[]).map(c => `
+    const displayContents = (contents) => get('contents').innerHTML = (contents||[]).map(c => `
         <div class="content">
             <div>${c.content||'No content'}</div>
             <div class="topics">Topics: ${Array.from(c.topics||[]).join(', ')||'None'}</div>
             <div class="meta">ID: ${c.contentId||'N/A'} | User: ${c.userId||'N/A'} | ${c.timestamp?new Date(c.timestamp).toLocaleString():'No timestamp'}</div>
             <div>${['LIKE','DISLIKE','COMMENT','REPORT'].map(t => `<button onclick="interact('${c.contentId||''}','${t}')">${t}</button>`).join('')}</div>
         </div>`).join('');
-    }
 
-    async function autoAdvanceTime() {
-        const r = Math.random();
-        const h = r < 0.15 ? 1 : 0; // 15% chance for 1 hour
-        const m = r < 0.15 ? Math.floor(Math.random() * 30) + 5 : Math.floor(Math.random() * 10) + 1; // 5-35min if hour, else 1-10min
-
-        const res = await fetchData(`http://localhost:8080/api/advance-time?days=0&hours=${h}&minutes=${m}`, 'POST', false);
-        const advanceText = h > 0 ? `+${h}h ${m}m` : `+${m}m`;
-        document.getElementById('timeAdvance').textContent = `Auto: ${advanceText}`;
+    const autoAdvanceTime = async () => {
+        const r = Math.random(), h = r < 0.15 ? 1 : 0, m = r < 0.15 ? Math.floor(Math.random() * 30) + 5 : Math.floor(Math.random() * 10) + 1;
+        await fetchData(`${base}/api/advance-time?days=0&hours=${h}&minutes=${m}`, 'POST', false);
+        get('timeAdvance').textContent = `Auto: ${h > 0 ? `+${h}h ${m}m` : `+${m}m`}`;
         fetchCurrentTime();
-        return res;
-    }
+    };
 
-    async function interact(contentId, type) {
+    const interact = async (contentId, type) => {
         if (!contentId) return showResponse('No content ID', true);
         try {
             await autoAdvanceTime();
-            const method = document.getElementById('discoveryMethod').value;
-            const res = await fetch(`http://localhost:8080/content/${contentId}/${type}?discoveryMethod=${method}&userId=${userId}`, {method: 'POST'});
+            const method = get('discoveryMethod').value;
+            const res = await fetch(`${base}/content/${contentId}/${type}?discoveryMethod=${method}&userId=${userId}`, {method: 'POST'});
             const text = await res.text();
-            let json;
-            try { json = JSON.parse(text); } catch(e) {}
+            let json; try { json = JSON.parse(text); } catch(e) {}
             showResponse(json ? JSON.stringify(json, null, 2) : text || 'Empty response', !res.ok);
             if (res.ok) fetchUserScores();
-        } catch(e) {
-            showResponse('Error: ' + e.message, true);
-        }
-    }
+        } catch(e) { showResponse('Error: ' + e.message, true); }
+    };
 
-    function showResponse(content, isError = false) {
-        document.getElementById('statsContent').innerHTML = `<div class="${isError ? 'error' : 'response'}">${content}</div>`;
-        document.getElementById('statsPanel').style.display = 'block';
-    }
+    const showResponse = (content, isError = false) => {
+        get('statsContent').innerHTML = `<div class="${isError ? 'error' : 'response'}">${content}</div>`;
+        get('statsPanel').style.display = 'block';
+    };
 
-    function closeStatsPanel() { document.getElementById('statsPanel').style.display = 'none'; }
+    const closeStatsPanel = () => get('statsPanel').style.display = 'none';
 
-    async function fetchUserScores() {
-        const scores = await fetchData(`http://localhost:8080/api/userScore/${userId}`);
-        document.getElementById('userScores').innerHTML = (scores||[]).sort((a,b) => (b.interestScore||0) - (a.interestScore||0))
+    const fetchUserScores = async () => {
+        const scores = await fetchData(`${base}/api/userScore/${userId}`);
+        get('userScores').innerHTML = (scores||[]).sort((a,b) => (b.interestScore||0) - (a.interestScore||0))
             .map(s => `<div class="score-item"><span>${s.topic||'Unknown'}</span><span>${(s.interestScore||0).toFixed(1)}</span></div>`).join('') || 'No scores';
-    }
+    };
 
-    async function fetchCurrentTime() {
-        const time = await fetchData('http://localhost:8080/api/current-time', 'GET', false);
-        document.getElementById('currentTime').textContent = time || 'Time unavailable';
-    }
+    const fetchCurrentTime = async () => {
+        const time = await fetchData(`${base}/api/current-time`, 'GET', false);
+        get('currentTime').textContent = time || 'Time unavailable';
+    };
 
-    async function advanceTime(d,h,m) {
-        const res = await fetchData(`http://localhost:8080/api/advance-time?days=${d}&hours=${h}&minutes=${m}`, 'POST', false);
+    const advanceTime = async () => {
+        const y = +get('y').value, mo = +get('mo').value, d = +get('d').value, h = +get('h').value, m = +get('m').value;
+        const totalDays = (y * 365) + (mo * 30) + d;
+        await fetchData(`${base}/api/advance-time?days=${totalDays}&hours=${h}&minutes=${m}`, 'POST', false);
         fetchCurrentTime();
-        document.getElementById('timeAdvance').textContent = '';
-    }
+        get('timeAdvance').textContent = '';
+    };
 
-    fetchData('http://localhost:8080/content').then(displayContents);
+    fetchData(`${base}/content`).then(displayContents);
     fetchCurrentTime();
     fetchUserScores();
 </script>
