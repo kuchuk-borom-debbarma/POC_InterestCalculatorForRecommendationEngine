@@ -1,5 +1,6 @@
 package dev.kuku.interestcalculator.UserTopicScoringSystem.TopicDecayer;
 
+import dev.kuku.interestcalculator.UserTopicScoringSystem.TopicDecayer.subSystem.TopicScoreTemporalExponentialDecayer;
 import dev.kuku.interestcalculator.fakeDatabase.UserTopicScoreDb;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -11,10 +12,10 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class UserTopicsScoreDecayerService {
     private final UserTopicScoreDb userTopicScoreDb;
+    private final TopicScoreTemporalExponentialDecayer exponentialDecayer;
 
     public void decayScore(String userId) {
-        Map<String, Double> topicScores = userTopicScoreDb.getUserTopicScores(userId).stream()
-                .collect(Collectors.toMap(r -> r.topic, r -> r.interestScore));
+        userTopicScoreDb.getUserTopicScores(userId).forEach(exponentialDecayer::decay);
 
     }
 }
